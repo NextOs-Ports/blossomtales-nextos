@@ -1,0 +1,201 @@
+{
+  "executable": "blossomtales/blossomtales-nextos",
+  "input_proof": {
+    "adapter_contract_sha256": "5e765006c2ea298dc77359b2914ad58837d5ca98a28519dc129d6d13bfc553b8",
+    "cases": [
+      {
+        "action": "player.attack",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "A",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "player.use_item",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "B",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "player.select_previous",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "L1",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "player.open_journal",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "L3",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "player.select_next",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "R1",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "system.back",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "SELECT",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "system.pause",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "START",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "player.use_tool",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "X",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "player.open_menu",
+        "context": "gameplay",
+        "context_source": "state:playing",
+        "control": "Y",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "menu.accept",
+        "context": "menu",
+        "context_source": "state:menu",
+        "control": "A",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      },
+      {
+        "action": "menu.back",
+        "context": "menu",
+        "context_source": "state:menu",
+        "control": "B",
+        "decision": "ACTION",
+        "delivery_count": 1,
+        "event": "press",
+        "sink": "adapter.input.android-keyevent"
+      }
+    ],
+    "contexts": [
+      {
+        "context": "gameplay",
+        "observed": true,
+        "source": "state:playing"
+      },
+      {
+        "context": "menu",
+        "observed": true,
+        "source": "state:menu"
+      }
+    ],
+    "evidence_class": "ON_DEVICE_AUTOMATED_INPUT_PROOF",
+    "generation": "c5ce3e3b75e265b6b13068e812c1416448ed0d34f6e37c88891c1241e386e949",
+    "mapping_sha256": "731b5d3187f270e3ad27a269f530e5de2325f25606430add9d57b640780b3f18",
+    "port_id": "blossomtales",
+    "run_id": "blossomtales-1935365-1788379978-14584",
+    "runtime": {
+      "evidence_schema": "nxinput-gptk-event-evidence/1",
+      "marker": "nxinput-gptk-runtime/3",
+      "symbols": [
+        "bt_sink_android_keyevent",
+        "nxinput_gptk_decide",
+        "nxinput_gptk_event_evidence_schema",
+        "nxinput_gptk_live_clear_context",
+        "nxinput_gptk_live_feed",
+        "nxinput_gptk_live_feed_vector",
+        "nxinput_gptk_live_init",
+        "nxinput_gptk_live_register",
+        "nxinput_gptk_live_register_vector",
+        "nxinput_gptk_live_seal",
+        "nxinput_gptk_live_set_context",
+        "nxinput_gptk_live_should_consume",
+        "nxinput_gptk_load_at",
+        "nxinput_gptk_load_receipt_json",
+        "nxinput_gptk_parse",
+        "nxinput_gptk_runtime_marker"
+      ]
+    },
+    "safety": {
+      "failed_ack": {
+        "native_replay": false,
+        "result": "FATAL"
+      },
+      "missing_sink": {
+        "delivery_count": 0,
+        "result": "PASSTHROUGH",
+        "suppressed": false
+      },
+      "unknown_context": {
+        "delivery_count": 0,
+        "result": "PASSTHROUGH",
+        "suppressed": false
+      }
+    },
+    "schema": "nxinput-gptk-event-evidence/1",
+    "schema_version": 1,
+    "sinks": [
+      {
+        "exists": true,
+        "method": "runtime-action-registry",
+        "sink": "adapter.input.android-keyevent",
+        "symbol": "bt_sink_android_keyevent",
+        "targets": [
+          "blossomtales/blossomtales-nextos"
+        ]
+      }
+    ],
+    "verdict": "OK"
+  },
+  "input_proof_receipt_sha256": "c3ba4449a22ef22e4670df987b8e5f3071be3fddc02893acca06bc56c66bce7a",
+  "schema": "nxrelease-candidate-lock-v1",
+  "schema_version": 1,
+  "sha256": "49e52b36ce032647c307e41c6ff4b6df0376c4bdc77edf73af7aa8c146fb1227",
+  "video_proof": {
+    "generation": "c5ce3e3b75e265b6b13068e812c1416448ed0d34f6e37c88891c1241e386e949",
+    "port_id": "blossomtales",
+    "reason": "non-black",
+    "run_id": "blossomtales-1935365-1788379978-14584",
+    "schema": "org.nextos.nxruntime.video-proof",
+    "schema_version": 1,
+    "verdict": "OK"
+  },
+  "video_proof_receipt_sha256": "9fea3b19678f5f2473994c99c117394a08b42598ca3ffb178b56b5079eca80b7"
+}
