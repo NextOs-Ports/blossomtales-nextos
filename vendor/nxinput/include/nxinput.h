@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 #define NXINPUT_API_VERSION 1u
-#define NXINPUT_VERSION "0.10.2"
+#define NXINPUT_VERSION "0.11.8"
 
 #define NXINPUT_MAX_PADS 4u
 #define NXINPUT_NAME_MAX 128u

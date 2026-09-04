@@ -127,19 +127,8 @@
     "controller_profiles": {
       "bundle": "controllers.nxb",
       "enabled": true,
-      "face_layout_variants": {
-        "modern": {
-          "bundle": "controllers-modern.nxb",
-          "sha256": "bfce688bb383cf2d239193ea3c4b3ea57b8bb28b06f46955b71bc0561ada139b"
-        },
-        "retro": {
-          "bundle": "controllers-retro.nxb",
-          "sha256": "3429bb94a48930b8cc9abb768957815138c686fd2436aca6eadadb5b6a3359f0"
-        }
-      },
       "sha256": "10feaf41cf8ee6203cf05c4202119e5bdba2dfb22db41e89ab31a5a9bd6eff13"
     },
-    "face_layout": "auto",
     "proof": {
       "clones": 2,
       "navigation": {
@@ -194,7 +183,7 @@
       }
     },
     "runtime_mapping": "nxinput-gptk",
-    "schema": 3
+    "schema": 4
   },
   "documentation": {
     "proven_support": [],
@@ -234,13 +223,13 @@
         "mode": "0755",
         "path": "blossomtales-nextos",
         "role": "executable",
-        "sha256": "49e52b36ce032647c307e41c6ff4b6df0376c4bdc77edf73af7aa8c146fb1227"
+        "sha256": "148a00ebba44b683ab13146df865574a7f961d292cfab329cf0a75ae44161f74"
       },
       {
         "mode": "0644",
-        "path": "port-env.sh",
+        "path": "adapter-env.sh",
         "role": "runtime-hook",
-        "sha256": "4385406d769ba4af495a82a3a80b4949fad1ef4f75241a18570d977c9adf9994"
+        "sha256": "05847c5e985ba0f93d75ffb26452d663126b313d58de174f57de43b3e2155574"
       },
       {
         "mode": "0644",
@@ -280,6 +269,7 @@
       "mode": "yes",
       "version": "1.3.0"
     },
+    "owner_runtime": "1",
     "prepare_script": "",
     "private_library_paths": [
       "libs"
@@ -296,20 +286,23 @@
       "input.controller-connected"
     ],
     "required_files": [
-      "blossomtales-nextos",
-      "port-env.sh"
+      "adapter-env.sh",
+      "blossomtales-nextos"
     ],
     "runtime_report": "log-and-logo",
     "schema_version": 3,
     "title": "Blossom Tales",
     "video_proof": "required"
   },
+  "owner_runtime": {
+    "hook_seed": "defaults-src/port-env.sh"
+  },
   "package_payload": [
     {
       "kind": "payload",
       "mode": "0644",
       "path": "INSTALLATION.md",
-      "sha256": "596e598ec1fd567afb7e98b070ea0b866955d6715f3d1e0e80e27736e461e849"
+      "sha256": "eea07ba1aa26875b9ff81da34580913ada34cb433944469b16e02a6d14dff848"
     },
     {
       "kind": "payload",
@@ -321,25 +314,13 @@
       "kind": "payload",
       "mode": "0644",
       "path": "README.md",
-      "sha256": "6ea2eead501442e8554d7ec097a2f46de61968504d7ca69ed8ec57bd225dff92"
+      "sha256": "ec7da99b0cf2116c481d6d34ab76360790c3170ed71c6f4912930009e0127538"
     },
     {
       "kind": "payload",
       "mode": "0644",
       "path": "SBOM.md",
-      "sha256": "971d925c24b06f8a0fa9d6020dad7a0211b237e8c7659fe546cf72554765d07a"
-    },
-    {
-      "kind": "payload",
-      "mode": "0644",
-      "path": "controllers-modern.nxb",
-      "sha256": "bfce688bb383cf2d239193ea3c4b3ea57b8bb28b06f46955b71bc0561ada139b"
-    },
-    {
-      "kind": "payload",
-      "mode": "0644",
-      "path": "controllers-retro.nxb",
-      "sha256": "3429bb94a48930b8cc9abb768957815138c686fd2436aca6eadadb5b6a3359f0"
+      "sha256": "82dcb931c6658f15ebac8b455149f347e4fb5d13b8b90d174c8c67705754a99a"
     },
     {
       "kind": "payload",
@@ -351,7 +332,7 @@
       "kind": "payload",
       "mode": "0644",
       "path": "version.txt",
-      "sha256": "78b591400c56b7b67b8cb3b2b8a8e65e9093897f02ce0878e6b5405c68620fa7"
+      "sha256": "f43a0292c674542a2d676a0f4f588a7ffbe1cbac25090df344b12ff1279f7820"
     }
   ],
   "portmaster": {
@@ -368,5 +349,19 @@
     }
   },
   "runtime_root": ".",
-  "schema_version": 3
+  "schema_version": 3,
+  "video": {
+    "aspect": "stretch",
+    "aspect_policies": [
+      "auto",
+      "engine",
+      "preserve",
+      "stretch"
+    ],
+    "authority": "nextos",
+    "auto_algorithm": "epsilon",
+    "filter": "engine",
+    "invalid_policy": "package_default",
+    "output_size": "display"
+  }
 }

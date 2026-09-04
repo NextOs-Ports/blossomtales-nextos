@@ -4,6 +4,14 @@
 #include <stdio.h>
 #include <string.h>
 
+static int live_control_bit(int control, uint32_t *bit) {
+  if (control < 0 || control >= (int)NXINPUT_GPTK_CONTROL_COUNT) {
+    return 0;
+  }
+  *bit = UINT32_C(1) << (unsigned int)control;
+  return 1;
+}
+
 static void live_error(char *error, size_t error_size, const char *message) {
   if (error != 0 && error_size > 0u) {
     (void)snprintf(error, error_size, "NXI1010: %s", message);
@@ -99,6 +107,76 @@ void nxinput_gptk_live_init(nxinput_gptk_live *live,
   live->map = map;
   /* The numeric value is irrelevant until context_proven becomes true. */
   live->context = NXINPUT_GPTK_CONTEXT_MENU;
+  /* 0.11.1: the universal neutral floor on both sticks (item 2). */
+  live->vector_neutral_floor[NXINPUT_GPTK_LEFT_STICK] =
+      NXINPUT_GPTK_LIVE_VECTOR_NEUTRAL_FLOOR_DEFAULT;
+  live->vector_neutral_floor[NXINPUT_GPTK_RIGHT_STICK] =
+      NXINPUT_GPTK_LIVE_VECTOR_NEUTRAL_FLOOR_DEFAULT;
+}
+
+int nxinput_gptk_live_set_vector_neutral_floor(nxinput_gptk_live *live,
+                                               int control, float floor_r) {
+  if (live == 0 || !live_is_vector_control(control)) {
+    return -1;
+  }
+  if (!(floor_r > 0.0f)) { /* NaN and negatives land here */
+    floor_r = 0.0f;
+  }
+  if (floor_r > NXINPUT_GPTK_LIVE_VECTOR_NEUTRAL_FLOOR_MAX) {
+    floor_r = NXINPUT_GPTK_LIVE_VECTOR_NEUTRAL_FLOOR_MAX;
+  }
+  live->vector_neutral_floor[control] = floor_r;
+  return 0;
+}
+
+float nxinput_gptk_live_vector_neutral_floor(const nxinput_gptk_live *live,
+                                             int control) {
+  if (live == 0 || !live_is_vector_control(control)) {
+    return 0.0f;
+  }
+  return live->vector_neutral_floor[control];
+}
+
+int nxinput_gptk_live_vector_is_neutral(const nxinput_gptk_live *live,
+                                        int control, float x, float y) {
+  float f;
+  if (live == 0 || !live_is_vector_control(control)) {
+    return 1;
+  }
+  f = live->vector_neutral_floor[control];
+  return x * x + y * y <= f * f;
+}
+
+nxinput_gptk_live_vector_edge nxinput_gptk_live_last_vector_edge(
+    const nxinput_gptk_live *live) {
+  return live == 0 ? NXINPUT_GPTK_VECTOR_EDGE_NONE
+                   : (nxinput_gptk_live_vector_edge)live->last_vector_edge;
+}
+
+int nxinput_gptk_live_vector_active(const nxinput_gptk_live *live, int control) {
+  uint32_t bit;
+  if (live == 0 || !live_control_bit(control, &bit)) {
+    return 0;
+  }
+  return (live->vector_active & bit) != 0u;
+}
+
+uint32_t nxinput_gptk_live_vector_released_mask(const nxinput_gptk_live *live) {
+  return live == 0 ? 0u : live->vector_released_mask;
+}
+
+/* Close every open gesture (release-all): the adapter reads the mask. */
+static void live_vector_release_all(nxinput_gptk_live *live) {
+  int control;
+  live->vector_released_mask = 0u;
+  for (control = 0; control < (int)NXINPUT_GPTK_CONTROL_COUNT; control++) {
+    uint32_t bit = UINT32_C(1) << (unsigned int)control;
+    if ((live->vector_active & bit) != 0u) {
+      live->vector_released_mask |= bit;
+      live->vector_gestures_closed++;
+    }
+  }
+  live->vector_active = 0u;
 }
 
 int nxinput_gptk_live_register(nxinput_gptk_live *live, const char *action,
@@ -214,6 +292,7 @@ void nxinput_gptk_live_clear_context(nxinput_gptk_live *live) {
   live->latched = 0u;
   live->context_proven = 0;
   live->context_source[0] = '\0';
+  live_vector_release_all(live);
 }
 
 int nxinput_gptk_live_clear_context_checked(nxinput_gptk_live *live) {
@@ -317,8 +396,16 @@ nxinput_gptk_live_result nxinput_gptk_live_feed(
   }
   bit = UINT32_C(1) << (unsigned int)control;
   down = pressed != 0;
-  if (((live->latched & bit) != 0u) == down) {
-    return NXINPUT_GPTK_LIVE_DELIVERED;
+  if (down && (live->latched & bit) != 0u) {
+    return NXINPUT_GPTK_LIVE_DELIVERED; /* duplicate press: already held by the action */
+  }
+  if (!down && (live->latched & bit) == 0u) {
+    /* 0.11.6: a release of a control this action never latched -- the press
+     * went out natively (context unproven at the time, or a native/none
+     * decision then). Reporting DELIVERED made the adapter drop the native
+     * release and the engine kept the button down. The release belongs to
+     * whoever saw the press: pass it through. */
+    return NXINPUT_GPTK_LIVE_PASSTHROUGH;
   }
   for (i = 0u; i < live->sink_count; i++) {
     if (strcmp(live->sinks[i].action, action) == 0) {
@@ -352,17 +439,32 @@ nxinput_gptk_live_result nxinput_gptk_live_feed_vector(
   nxinput_gptk_decision decision;
   size_t i;
   size_t delivered = 0u;
+  uint32_t bit = 0u;
+  int was_active;
+  int neutral;
 
+  if (live != 0) {
+    live->last_vector_edge = NXINPUT_GPTK_VECTOR_EDGE_NONE;
+  }
   if (!nxinput_gptk_live_ready(live) || !live_is_vector_control(control)) {
     return NXINPUT_GPTK_LIVE_PASSTHROUGH;
   }
+  (void)live_control_bit(control, &bit);
+  was_active = (live->vector_active & bit) != 0u;
+  neutral = nxinput_gptk_live_vector_is_neutral(live, control, x, y);
   decision = nxinput_gptk_decide(live->map, live->context, control, &action);
-  if (decision == NXINPUT_GPTK_DECIDE_NONE ||
-      decision == NXINPUT_GPTK_DECIDE_NATIVE) {
+  if (decision != NXINPUT_GPTK_DECIDE_ACTION) {
+    /* NONE/NATIVE/SUPPRESS: nothing is delivered; an open gesture closes
+     * on the evidence (it cannot stay open on a control nobody owns). */
+    if (was_active) {
+      live->vector_active &= ~bit;
+      live->vector_gestures_closed++;
+      live->last_vector_edge = NXINPUT_GPTK_VECTOR_EDGE_CLOSED;
+    }
+    if (decision == NXINPUT_GPTK_DECIDE_SUPPRESS) {
+      return NXINPUT_GPTK_LIVE_SUPPRESSED;
+    }
     return NXINPUT_GPTK_LIVE_PASSTHROUGH;
-  }
-  if (decision == NXINPUT_GPTK_DECIDE_SUPPRESS) {
-    return NXINPUT_GPTK_LIVE_SUPPRESSED;
   }
   for (i = 0u; i < live->vector_sink_count; i++) {
     if (strcmp(live->vector_sinks[i].action, action) == 0) {
@@ -371,6 +473,7 @@ nxinput_gptk_live_result nxinput_gptk_live_feed_vector(
           0) {
         live->fatal = 1;
         live->context_proven = 0;
+        live->vector_active &= ~bit;
         return NXINPUT_GPTK_LIVE_FATAL;
       }
     }
@@ -378,7 +481,18 @@ nxinput_gptk_live_result nxinput_gptk_live_feed_vector(
   if (delivered == 0u) {
     live->fatal = 1;
     live->context_proven = 0;
+    live->vector_active &= ~bit;
     return NXINPUT_GPTK_LIVE_FATAL;
+  }
+  /* The gesture edge, by the neutral FLOOR, never by `!= 0` (item 2). */
+  if (!was_active && !neutral) {
+    live->vector_active |= bit;
+    live->vector_gestures_opened++;
+    live->last_vector_edge = NXINPUT_GPTK_VECTOR_EDGE_OPENED;
+  } else if (was_active && neutral) {
+    live->vector_active &= ~bit;
+    live->vector_gestures_closed++;
+    live->last_vector_edge = NXINPUT_GPTK_VECTOR_EDGE_CLOSED;
   }
   return NXINPUT_GPTK_LIVE_DELIVERED;
 }

@@ -5,6 +5,7 @@
  * device is announced. It opens no device, guesses no domain and announces
  * nothing itself: the caller announces only on ADMIT. */
 #include "nxinput_sdl_seam.h"
+#include "nxinput_decision.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,7 @@ static int ops_valid(const nxinput_sdl_seam_ops *ops) {
   return ops != 0 && ops->api_version == NXINPUT_SDL_SEAM_API_VERSION &&
          (ops->struct_size == NXINPUT_SDL_SEAM_OPS_SIZE_0_8_1 ||
           ops->struct_size == NXINPUT_SDL_SEAM_OPS_SIZE_0_9_0 ||
+          ops->struct_size == NXINPUT_SDL_SEAM_OPS_SIZE_0_10_0 ||
           ops->struct_size == sizeof(*ops)) &&
          ops->getenv_fn != 0 &&
          ops->read_text_fn != 0 && ops->add_mapping_fn != 0 &&
@@ -32,13 +34,31 @@ static int ops_has_normalizer(const nxinput_sdl_seam_ops *ops) {
 
 /* The 0.10.0 tail members are read ONLY from a full-size table. */
 static int ops_has_livedb(const nxinput_sdl_seam_ops *ops) {
-  return ops != 0 && ops->struct_size == sizeof(*ops) &&
+  return ops != 0 && ops->struct_size >= NXINPUT_SDL_SEAM_OPS_SIZE_0_10_0 &&
          ops->livedb_acquire_fn != 0;
 }
 
 static uint8_t ops_face_layout(const nxinput_sdl_seam_ops *ops) {
-  return ops != 0 && ops->struct_size == sizeof(*ops) ? ops->face_layout
+  return ops != 0 && ops->struct_size >= NXINPUT_SDL_SEAM_OPS_SIZE_0_10_0
+             ? ops->face_layout
                                                       : (uint8_t)0u;
+}
+
+/* V5: the TARGET domain is the provider descriptor's, never the major's
+ * upstream presumption. Without a V5 glue it is UNDECLARED (= UNKNOWN). */
+static nxinput_sdl_domain seam_target_domain(const nxinput_sdl_seam_ops *ops) {
+  if (ops != 0 && ops->struct_size == sizeof(*ops)) {
+    return (nxinput_sdl_domain)ops->provider_domain;
+  }
+  return NXINPUT_SDL_DOMAIN_UNDECLARED;
+}
+static const char *seam_source_domain_name(const nxinput_sdl_seam_ops *ops,
+                                           unsigned int domain_lines) {
+  if (ops != 0 && ops->struct_size == sizeof(*ops) &&
+      ops->source_domain_slot != 0) {
+    return nxinput_sdl_domain_name((nxinput_sdl_domain)*ops->source_domain_slot);
+  }
+  return domain_lines > 0u ? "joydev-legacy" : "unchanged";
 }
 
 static const char *face_layout_word(uint8_t value) {
@@ -84,11 +104,30 @@ static void sanitize_name(const char *name, char *out, size_t cap) {
   }
 }
 
+/* forward declarations (0.11.1 stock mode uses these before they are defined) */
+static int crc_alias(const char *candidate, const char *live);
+static nxinput_sdl_seam_slot *slot_for(nxinput_sdl_seam *seam, int32_t instance_id);
+static nxinput_sdl_seam_slot *slot_free(nxinput_sdl_seam *seam);
+static void emit(nxinput_sdl_seam *seam, const nxinput_sdl_seam_ops *ops,
+                 const nxinput_sdl_seam_device *device, const char *stage,
+                 const char *detail);
+static const char *face_layout_word(uint8_t value);
+static uint64_t fnv1a64(const char *text);
+static void sanitize_name(const char *name, char *out, size_t cap);
+
+/* 0.11.1: the driver of a device record, UNKNOWN for older layouts. */
+static uint8_t device_driver(const nxinput_sdl_seam_device *device) {
+  return device != 0 && device->struct_size == sizeof(*device)
+             ? device->driver
+             : (uint8_t)NXINPUT_PROVIDER_DRIVER_UNKNOWN;
+}
+
 static int device_valid(const nxinput_sdl_seam_device *device) {
   size_t n;
 
   if (device == 0 || device->api_version != NXINPUT_SDL_SEAM_API_VERSION ||
       (device->struct_size != sizeof(*device) &&
+       device->struct_size != NXINPUT_SDL_SEAM_DEVICE_SIZE_0_10_0 &&
        device->struct_size != NXINPUT_SDL_SEAM_DEVICE_SIZE_0_9_0)) {
     return 0;
   }
@@ -99,12 +138,210 @@ static int device_valid(const nxinput_sdl_seam_device *device) {
       strcmp(device->guid, "00000000000000000000000000000000") == 0) {
     return 0;
   }
+  /* A HIDAPI device has no evdev capabilities to measure: the provider's
+   * own driver owns it (stock mode); the counts are not consulted. */
+  if (device_driver(device) == (uint8_t)NXINPUT_PROVIDER_DRIVER_HIDAPI) {
+    return 1;
+  }
+  /* 0.11.6: a device the glue could not measure (no devpath from the
+   * provider, node not readable by this user, hotplug race, refused
+   * symlink) is VIRTUAL/UNKNOWN with buttons=-1. The provider still owns a
+   * pad it enumerated; blocking it made the game mute where stock SDL would
+   * have worked (mission 1.4: UNKNOWN = stock, never a blocked pad). */
+  if (device->buttons < 0 &&
+      (device_driver(device) == (uint8_t)NXINPUT_PROVIDER_DRIVER_VIRTUAL ||
+       device_driver(device) == (uint8_t)NXINPUT_PROVIDER_DRIVER_UNKNOWN)) {
+    return 1;
+  }
   /* Capabilities are MEASURED. Zero buttons and zero axes is not a pad. */
   if (device->buttons < 0 || device->axes < 0 || device->hats < 0 ||
       (device->buttons == 0 && device->axes == 0)) {
     return 0;
   }
   return 1;
+}
+
+/* 0.11.1: the seam has NO table for this device -> stock mode.
+ * 0.11.4 (review 2, N2): a mapping line LEFT in SDL's own environment (the
+ * staging kept it there because the provider was not decided before init)
+ * was imported at USER priority; nothing the seam installs afterwards at API
+ * priority can outrank it. Deciding the provider later (in-process
+ * measurement) must therefore NOT flip this process into provider mode: the
+ * mode is decided once, before init, and a line left for stock stays stock
+ * -- otherwise the receipt says "rewritten" while the effective line is the
+ * untouched one. */
+static int seam_stock_mode(const nxinput_sdl_seam_ops *ops,
+                           const nxinput_sdl_seam_device *device) {
+  const char *env_line;
+  if (device_driver(device) == (uint8_t)NXINPUT_PROVIDER_DRIVER_HIDAPI) {
+    return 1;
+  }
+  if (device != 0 && device->buttons < 0 &&
+      (device_driver(device) == (uint8_t)NXINPUT_PROVIDER_DRIVER_VIRTUAL ||
+       device_driver(device) == (uint8_t)NXINPUT_PROVIDER_DRIVER_UNKNOWN)) {
+    return 1; /* 0.11.6: unmeasurable device = stock (see device_valid) */
+  }
+  if (ops == 0 || ops->struct_size != sizeof(*ops)) {
+    return 0;
+  }
+  if (seam_target_domain(ops) == NXINPUT_SDL_DOMAIN_UNDECLARED) {
+    return 1;
+  }
+  if (ops->env_left_for_stock) {
+    env_line = ops->getenv_fn(ops->userdata, NXINPUT_AUTHORITY_ENV_MAPPING);
+    if (env_line != 0 && env_line[0] != '\0') {
+      return 1; /* left for stock before init: stock for the whole run */
+    }
+  }
+  return 0;
+}
+
+/* Copy the lines of `source` whose GUID is `guid` (after CRC-alias
+ * projection onto the live GUID) into `out`, newline separated. Returns the
+ * number of lines copied. */
+static unsigned int lines_for_guid(const char *source, const char *guid,
+                                   char *out, size_t cap) {
+  size_t used = 0u;
+  unsigned int count = 0u;
+  const char *cursor = source;
+  out[0] = '\0';
+  while (cursor != 0 && *cursor != '\0') {
+    const char *eol = strchr(cursor, '\n');
+    size_t length = eol != 0 ? (size_t)(eol - cursor) : strlen(cursor);
+    size_t trimmed = length;
+    while (trimmed > 0u && (cursor[trimmed - 1u] == '\r' ||
+                            cursor[trimmed - 1u] == ' ')) {
+      trimmed--;
+    }
+    if (trimmed > 33u && cursor[32] == ',' &&
+        (memcmp(cursor, guid, 32u) == 0 || crc_alias(cursor, guid))) {
+      if (used + trimmed + 2u >= cap) {
+        break;
+      }
+      memcpy(out + used, cursor, trimmed);
+      /* project the zero-CRC alias onto the live GUID, as SDL's lookup does */
+      memcpy(out + used + 4, guid + 4, 4u);
+      used += trimmed;
+      out[used++] = '\n';
+      out[used] = '\0';
+      count++;
+    }
+    if (eol == 0) {
+      break;
+    }
+    cursor = eol + 1;
+  }
+  return count;
+}
+
+/* 0.11.1: STOCK MODE admission. Nothing is translated and nothing external
+ * enters the store; the provider's own mapping (environment import,
+ * built-in database, HIDAPI synthesis) is read back and reported. The one
+ * reinstatement (legacy blind staging removed the CFW's own env line) goes
+ * through the 1.4 machine as EXISTING_NATIVE_PASSTHROUGH. */
+static nxinput_sdl_seam_result seam_admit_stock(
+    nxinput_sdl_seam *seam, const nxinput_sdl_seam_ops *ops,
+    const nxinput_sdl_seam_device *device, const char *env_mapping,
+    int env_was_staged) {
+  char held[NXINPUT_SOVEREIGN_LINE_MAX];
+  char detail[900];
+  char name_evidence[64];
+  nxinput_sdl_seam_slot *slot;
+  int present;
+  int reinstated = 0;
+  unsigned int reinstated_lines = 0u;
+  int bundle_ignored =
+      ops->getenv_fn(ops->userdata, NXINPUT_AUTHORITY_ENV_BUNDLE) != 0;
+  nxinput_decision d;
+  nxinput_decision_input in;
+  uint8_t driver = device_driver(device);
+
+  held[0] = '\0';
+  present = ops->mapping_for_guid_fn(ops->userdata, device->guid, held,
+                                     sizeof held) == 0 && held[0] != '\0';
+  memset(&in, 0, sizeof in);
+  in.source_trust = env_was_staged ? NXINPUT_TRUST_PROVED : NXINPUT_TRUST_UNKNOWN;
+  in.consumer_kind = ops->api == (uint8_t)NXINPUT_SDL_API_3
+                         ? NXINPUT_CONSUMER_SDL3 : NXINPUT_CONSUMER_SDL2;
+  in.consumer_table = NXINPUT_CTABLE_UNKNOWN;
+  /* The CFW's own env line for the SDL the CFW ships is native to that
+   * provider by provenance: 1.4 EXISTING_NATIVE_PASSTHROUGH. */
+  in.existing_native_proved = present || env_was_staged;
+  memset(&d, 0, sizeof d);
+  (void)nxinput_decision_decide(&in, &d);
+  /* Legacy blind staging removed the CFW's own line before the descriptor
+   * existed: whatever the provider holds now (an automatic/built-in
+   * mapping) is NOT what stock would have held (the env line outranks
+   * both at USER priority), so the line is handed back -- env source only. */
+  if (env_was_staged && env_mapping != 0 && env_mapping[0] != '\0' &&
+      driver != (uint8_t)NXINPUT_PROVIDER_DRIVER_HIDAPI && d.passthrough) {
+    char *lines = (char *)malloc(NXINPUT_AUTHORITY_SOURCE_MAX);
+    if (lines != 0) {
+      reinstated_lines = lines_for_guid(env_mapping, device->guid, lines,
+                                        NXINPUT_AUTHORITY_SOURCE_MAX);
+      if (reinstated_lines > 0u) {
+        char *cursor = lines;
+        while (*cursor != '\0') {
+          char *eol = strchr(cursor, '\n');
+          if (eol != 0) {
+            *eol = '\0';
+          }
+          if (ops->add_mapping_fn(ops->userdata, cursor) == 0) {
+            reinstated = 1;
+          }
+          if (eol == 0) {
+            break;
+          }
+          cursor = eol + 1;
+        }
+        held[0] = '\0';
+        present = ops->mapping_for_guid_fn(ops->userdata, device->guid, held,
+                                           sizeof held) == 0 && held[0] != '\0';
+      }
+      free(lines);
+    }
+  }
+  sanitize_name(device->struct_size >= NXINPUT_SDL_SEAM_DEVICE_SIZE_0_10_0 &&
+                        device->struct_size != NXINPUT_SDL_SEAM_DEVICE_SIZE_0_9_0
+                    ? device->name : 0,
+                name_evidence, sizeof name_evidence);
+  slot = slot_for(seam, device->instance_id);
+  if (slot == 0) {
+    slot = slot_free(seam);
+  }
+  if (slot != 0) {
+    memset(slot, 0, sizeof *slot);
+    slot->in_use = 1;
+    slot->instance_id = device->instance_id;
+    memcpy(slot->guid, device->guid, 33u);
+    (void)snprintf(slot->line, sizeof slot->line, "%s", held);
+    slot->source = NXINPUT_SOVEREIGN_RUNTIME_BUILTIN;
+  }
+  seam->admitted++;
+  (void)snprintf(detail, sizeof detail,
+                 "result=admit source=%s decision=%s passthrough=%u "
+                 "translated=0 mapping_present=%d env_reinstated=%d "
+                 "env_reinstated_lines=%u store_mutated=%d bundle_ignored=%d "
+                 "driver=%s target_domain=%s provider_method=%s name=%s "
+                 "face_layout=%s effective_guid=%.32s map_fnv1a64=%016llx "
+                 "map_bytes=%u",
+                 driver == (uint8_t)NXINPUT_PROVIDER_DRIVER_HIDAPI
+                     ? "provider-native-hidapi" : "stock-passthrough",
+                 nxinput_decision_name((nxinput_mapping_decision)d.decision),
+                 (unsigned)d.passthrough, present, reinstated,
+                 reinstated_lines, reinstated, bundle_ignored,
+                 nxinput_provider_driver_name((nxinput_provider_driver)driver),
+                 nxinput_sdl_domain_name(seam_target_domain(ops)),
+                 ops->struct_size == sizeof(*ops)
+                     ? nxinput_provider_method_name(
+                           (nxinput_provider_method)ops->provider_method)
+                     : "unknown",
+                 name_evidence, face_layout_word(ops_face_layout(ops)),
+                 held[0] != '\0' ? held : "-",
+                 (unsigned long long)fnv1a64(held),
+                 (unsigned int)strlen(held));
+  emit(seam, ops, device, "announce", detail);
+  return NXINPUT_SDL_SEAM_ADMIT_STOCK;
 }
 
 static void emit(nxinput_sdl_seam *seam, const nxinput_sdl_seam_ops *ops,
@@ -270,6 +507,16 @@ static int normalize_source(nxinput_sdl_seam *seam,
   if (source == 0 || out == 0 || cap == 0u || out == source) {
     return -1;
   }
+  /* V5 (1.4): with a V5 ops table whose provider is UNKNOWN, an EXTERNAL
+   * ordinal line (env / CFW database / bundle) never reaches the setter,
+   * not even unchanged: the source yields and only what already belongs to
+   * the provider (its built-in database) or a declared raw route remains.
+   * Preserving the bytes for diagnosis is the normalizer's receipt, not an
+   * admission. */
+  if (ops->struct_size == sizeof(*ops) &&
+      seam_target_domain(ops) == NXINPUT_SDL_DOMAIN_UNDECLARED) {
+    return -1;
+  }
   if (!ops_has_normalizer(ops)) {
     length = strlen(source);
     if (length >= cap) {
@@ -413,9 +660,29 @@ static int bridge_device_caps(void *userdata, int device_index, int *buttons,
   return 0;
 }
 
+/* Forward: the slot table scan lives below. */
+static const nxinput_sdl_seam_slot *colliding_slot(
+    const nxinput_sdl_seam *seam, int32_t instance_id, const char *guid,
+    const char *line);
+
 static int bridge_apply_mapping(void *userdata, const char *line) {
   struct bridge bridge = bridge_of(userdata);
   struct bridge *b = &bridge;
+  nxinput_sdl_seam *seam = (nxinput_sdl_seam *)userdata;
+  const nxinput_sdl_seam_slot *clash;
+  if (b->ops == 0 || b->device == 0) {
+    return -1;
+  }
+  /* V5 (C3): SDL stores mappings BY GUID. If a LIVE instance with this GUID
+   * already holds a semantically different line, calling the setter would
+   * silently redefine that pad. Refuse HERE, before the store changes; the
+   * decision then fails and admit() reports the collision. */
+  clash = colliding_slot(seam, b->device->instance_id, b->device->guid, line);
+  if (clash != 0) {
+    seam->pending_collision = 1;
+    seam->pending_collision_instance = clash->instance_id;
+    return -1;
+  }
   return b->ops->add_mapping_fn(b->ops->userdata, line);
 }
 
@@ -529,6 +796,7 @@ const char *nxinput_sdl_seam_result_name(nxinput_sdl_seam_result result) {
     case NXINPUT_SDL_SEAM_BLOCK_OPS: return "block-ops";
     case NXINPUT_SDL_SEAM_BLOCK_IDENTITY: return "block-identity";
     case NXINPUT_SDL_SEAM_BLOCK_AUTHORITY: return "block-authority";
+    case NXINPUT_SDL_SEAM_ADMIT_STOCK: return "admit-stock";
     case NXINPUT_SDL_SEAM_BLOCK_COLLISION:
     default: return "block-collision";
   }
@@ -616,6 +884,13 @@ nxinput_sdl_seam_result nxinput_sdl_seam_admit(
     return NXINPUT_SDL_SEAM_NO_DECLARATION;
   }
 
+  /* 0.11.1: no table for this device => STOCK MODE, never a mute pad. */
+  if (seam_stock_mode(ops, device)) {
+    return seam_admit_stock(seam, ops, device, env_mapping,
+                            ops->staged_mapping != 0 &&
+                                ops->staged_mapping[0] != '\0');
+  }
+
   /* THE C3 ORDER, unchanged. The seam points the already-initialised
    * authority at THIS device and obeys the answer. The authority itself is
    * not rebuilt here: its per-instance entries have to outlive one call. */
@@ -697,7 +972,8 @@ nxinput_sdl_seam_result nxinput_sdl_seam_admit(
   seam->current_crc_aliases = 0u;
   seam->current_ops = 0;
   seam->current_device = 0;
-  sanitize_name(device->struct_size == sizeof(*device) ? device->name : 0,
+  sanitize_name(device->struct_size != NXINPUT_SDL_SEAM_DEVICE_SIZE_0_9_0
+                    ? device->name : 0,
                 name_evidence, sizeof name_evidence);
   (void)snprintf(evidence_tail, sizeof evidence_tail,
                  "name=%s db_class=%s db_target=%s db_retries=%u "
@@ -712,6 +988,21 @@ nxinput_sdl_seam_result nxinput_sdl_seam_admit(
                  (unsigned long long)(seam->current_db_receipt.elapsed_ns /
                                       1000000ull),
                  face_layout_word(ops_face_layout(ops)));
+  if (authority_status != 0 && seam->pending_collision) {
+    /* V5 (C3): refused at the setter; the store never changed. */
+    (void)snprintf(detail, sizeof detail,
+                   "result=block reason=guid-store-collision "
+                   "other_instance=%ld same_guid=1 divergent_mapping=1 "
+                   "store_mutated=0",
+                   (long)seam->pending_collision_instance);
+    seam->pending_collision = 0;
+    emit(seam, ops, device, "collision", detail);
+    nxinput_authority_forget(&seam->authority, device->instance_id);
+    seam->collisions++;
+    seam->blocked++;
+    return NXINPUT_SDL_SEAM_BLOCK_COLLISION;
+  }
+  seam->pending_collision = 0;
   if (authority_status != 0) {
     (void)snprintf(detail, sizeof detail,
                    "result=block reason=%s source=%s "
@@ -729,9 +1020,8 @@ nxinput_sdl_seam_result nxinput_sdl_seam_admit(
                    decision.readback_checked, source_crc_aliases,
                    decision.duplicate_lastwins, source_domain_lines,
                    source_domain_bindings,
-                   source_domain_lines > 0u ? "joydev-legacy" : "unchanged",
-                   nxinput_sdl_domain_name(nxinput_sdl_api_domain(
-                       (nxinput_sdl_api)ops->api)),
+                   seam_source_domain_name(ops, source_domain_lines),
+                   nxinput_sdl_domain_name(seam_target_domain(ops)),
                    evidence_tail);
     emit(seam, ops, device, "authority", detail);
     seam->blocked++;
@@ -825,9 +1115,8 @@ nxinput_sdl_seam_result nxinput_sdl_seam_admit(
                  seam->authority.resolutions, seam->admitted,
                  decision.duplicate_lastwins, source_domain_lines,
                  source_domain_bindings,
-                 source_domain_lines > 0u ? "joydev-legacy" : "unchanged",
-                 nxinput_sdl_domain_name(nxinput_sdl_api_domain(
-                     (nxinput_sdl_api)ops->api)),
+                 seam_source_domain_name(ops, source_domain_lines),
+                 nxinput_sdl_domain_name(seam_target_domain(ops)),
                  evidence_tail,
                  decision.line[0] != '\0' ? decision.line : "-",
                  (unsigned long long)fnv1a64(decision.line),
@@ -881,4 +1170,29 @@ int nxinput_sdl_seam_stage_before_init(const nxinput_sdl_seam_env_ops *ops,
   }
   *staged_len = n;
   return 0;
+}
+
+int nxinput_sdl_seam_stage_with_provider(
+    const nxinput_sdl_seam_env_ops *ops,
+    const nxinput_provider_descriptor *provider, char *out, size_t cap,
+    size_t *staged_len, int *left_for_stock) {
+  if (left_for_stock != 0) {
+    *left_for_stock = 0;
+  }
+  if (!env_ops_valid(ops) || out == 0 || cap == 0u || staged_len == 0) {
+    return -1;
+  }
+  *staged_len = 0u;
+  out[0] = '\0';
+  if (ops->sdl_was_init_fn(ops->userdata) != 0) {
+    return -1;
+  }
+  if (provider == 0 || !nxinput_provider_allows_rewrite(provider)) {
+    /* UNKNOWN provider: the CFW's line stays where its own SDL reads it. */
+    if (left_for_stock != 0) {
+      *left_for_stock = 1;
+    }
+    return 0;
+  }
+  return nxinput_sdl_seam_stage_before_init(ops, out, cap, staged_len);
 }

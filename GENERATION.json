@@ -3,97 +3,102 @@
     {
       "mode": "0755",
       "path": "Blossom Tales.sh",
-      "sha256": "31a975b6bbf5b2acbe735752ff1db75bb6cb0647079f35d8f0c2e4f158f41aac"
+      "sha256": "b05eb45a7f258540560271c75fed660f809f268f318d57acd065957ab1989c86"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/commit",
-      "sha256": "cd22a11ea58b74bb9017c42aa03d6cfc54b6a0522f36572a50bb374ff19c67b3"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/commit",
+      "sha256": "6f8c36edae77e340970a138e9cdf88c31334487f9c8737194d4e37d4f4485e56"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/components.sha256",
-      "sha256": "63d03c702f3befc6eedee2a6afe6374b54a623b72dc116c0b04532e463ecb13c"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/components.sha256",
+      "sha256": "cbade2c2744e22f067d8c4040d9f0c83dc44fbe816caedd33661bf3cd8e78a4d"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/components.v2",
-      "sha256": "a0990825acdb510a9b0de68c6bac00b2768922f1b203a2f29ea197771b4d4eeb"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/components.v2",
+      "sha256": "a63affeca6295d23323b7898b914972015e12a66818776230bc9fd80a80a6264"
     },
     {
       "mode": "0755",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/launcher/Blossom Tales.sh",
-      "sha256": "31a975b6bbf5b2acbe735752ff1db75bb6cb0647079f35d8f0c2e4f158f41aac"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/launcher/Blossom Tales.sh",
+      "sha256": "b05eb45a7f258540560271c75fed660f809f268f318d57acd065957ab1989c86"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/nxport.json",
-      "sha256": "91b33908ddc9b7afd9786c8135ec2f7a32f1a3887e6d2a5cbe680f30adbd1cd7"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/nxport.json",
+      "sha256": "19a0952b030aa90b50c186c2fb7b6ac48ff2991f5499ad4b3ca749a33416b5f0"
+    },
+    {
+      "mode": "0644",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/adapter-env.sh",
+      "sha256": "05847c5e985ba0f93d75ffb26452d663126b313d58de174f57de43b3e2155574"
     },
     {
       "mode": "0755",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/blossomtales-nextos",
-      "sha256": "acdfbf00777db6511a4b3563dcb53d216d8999e491ee273c44d0a6dca97c2b88"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/blossomtales-nextos",
+      "sha256": "148a00ebba44b683ab13146df865574a7f961d292cfab329cf0a75ae44161f74"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/extractor.json",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/extractor.json",
       "sha256": "c5fffb63197a6715f4dd53c0e2c14dd316500e1c92871f7db63101d32a5576e4"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/nxextract/nxextract-runtime-env.sh",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/nxextract/nxextract-runtime-env.sh",
       "sha256": "332919a9960d4317563b647f9932d1a4367da147a425fe2f78eafd706f01563f"
     },
     {
       "mode": "0755",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/nxextract/nxextract-ui",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/nxextract/nxextract-ui",
       "sha256": "8e4a68ae0a611096d23b04628b4f2e8b5cf34755fe9b71d134bc0d7ea6ccf987"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/nxextract/nxextract.py",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/nxextract/nxextract.py",
       "sha256": "e59a1e525ea475635c2e8f51bff3c6fff8cdaad406c158e3dad011cdd96876a7"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/nxextract/run-extractor.sh",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/nxextract/run-extractor.sh",
       "sha256": "583d046d4d95a2d15d66f0aee35911097698b34b0bd33732b2a517e6408bf9d0"
     },
     {
       "mode": "0755",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/nxsplash-nextos",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/files/runtime/nxsplash-nextos",
       "sha256": "d85d896a906a778c9af250e5617d45d085a98b18552cb0254addbbc626036c97"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/files/runtime/port-env.sh",
-      "sha256": "e99f34634809ad2772f09d8959dcc67f507ad9d918ab175d82cf407a704a0851"
-    },
-    {
-      "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/format",
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/format",
       "sha256": "aac4fb5944aa71482880d8838e4de375fd47c4c9a80b6c17043859aee6e20034"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/identity-runtime.v2",
-      "sha256": "c4c0745f0a64b9f9e62c08aa3987c8b997b863d33ba9aaa676b2c9a64390cc42"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/identity-runtime.v2",
+      "sha256": "b6955178b69dcafe836c3c290b8a14db14f4375f9b88e8243591002f9e666986"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/identity.json",
-      "sha256": "5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/identity.json",
+      "sha256": "48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/.nxruntime/generations/5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93/manifest.json",
-      "sha256": "3d05f5ab2a70cd3ebe87c357b0620591df71864290dbf02a525ddfc2724ba108"
+      "path": "blossomtales/.nxruntime/generations/48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788/manifest.json",
+      "sha256": "d156e5ba36f5a4b5af9236087bb2cf1ea007bac7f8f99786fe5fccd26f207ff8"
+    },
+    {
+      "mode": "0644",
+      "path": "blossomtales/CONTROLS-CLOSURE.json",
+      "sha256": "1cdd0633b59281b42a26444ee5d47f6d595e059f5b9ca42bc985acc062e5a436"
     },
     {
       "mode": "0644",
       "path": "blossomtales/INSTALLATION.md",
-      "sha256": "596e598ec1fd567afb7e98b070ea0b866955d6715f3d1e0e80e27736e461e849"
+      "sha256": "eea07ba1aa26875b9ff81da34580913ada34cb433944469b16e02a6d14dff848"
     },
     {
       "mode": "0644",
@@ -107,33 +112,53 @@
     },
     {
       "mode": "0644",
+      "path": "blossomtales/OWNERSHIP.json",
+      "sha256": "07d61ff933ff598f554f9f18e64905b54a258e2d63e89ecf5037edeaa899d640"
+    },
+    {
+      "mode": "0644",
       "path": "blossomtales/README.md",
-      "sha256": "10319a40e19225380ccfd113fa9b9d45b1a4a8ebd6604a50192286f8e082cb9c"
+      "sha256": "ec7da99b0cf2116c481d6d34ab76360790c3170ed71c6f4912930009e0127538"
     },
     {
       "mode": "0644",
       "path": "blossomtales/SBOM.md",
-      "sha256": "971d925c24b06f8a0fa9d6020dad7a0211b237e8c7659fe546cf72554765d07a"
+      "sha256": "82dcb931c6658f15ebac8b455149f347e4fb5d13b8b90d174c8c67705754a99a"
+    },
+    {
+      "mode": "0644",
+      "path": "blossomtales/adapter-env.sh",
+      "sha256": "05847c5e985ba0f93d75ffb26452d663126b313d58de174f57de43b3e2155574"
     },
     {
       "mode": "0644",
       "path": "blossomtales/adapter/adapter-contract.json",
-      "sha256": "5859d8a11210f125c01c9cd4e9e55b9e9fdfd678c804bc74fecbe3d3b9ea69da"
+      "sha256": "f7e339fc33960057595e343b0ad131f1ae2eca5888515005ec97032c16b8695a"
     },
     {
       "mode": "0755",
       "path": "blossomtales/blossomtales-nextos",
-      "sha256": "acdfbf00777db6511a4b3563dcb53d216d8999e491ee273c44d0a6dca97c2b88"
+      "sha256": "148a00ebba44b683ab13146df865574a7f961d292cfab329cf0a75ae44161f74"
+    },
+    {
+      "mode": "0644",
+      "path": "blossomtales/controllers.nxb",
+      "sha256": "10feaf41cf8ee6203cf05c4202119e5bdba2dfb22db41e89ab31a5a9bd6eff13"
     },
     {
       "mode": "0644",
       "path": "blossomtales/defaults/NEXTOSCONTROLLERS.gptk",
-      "sha256": "8d6137bea72028ba1d5dd787a5df21ffdf28bc118258b538d34dd42adb0b7b62"
+      "sha256": "bb5bc73d4a2c95a261ba73417784c50c51cb0b465f124a1d3ac5ec5ddd505333"
     },
     {
       "mode": "0644",
       "path": "blossomtales/defaults/NEXTOSSETTINGS.txt",
-      "sha256": "23fb75137e9a47a0c531b5a09c0af6bf7e917a12161d69e73a6741efedf17dcd"
+      "sha256": "c74548b75905ae38a6ae024cecc5e3bd806dc5667a434aa526e3668afd6c05f0"
+    },
+    {
+      "mode": "0644",
+      "path": "blossomtales/defaults/port-env.sh",
+      "sha256": "aacd83b8b7482aa80fd12c4591510c87a8cc8c976ef5a1156d01b1e5bc10e480"
     },
     {
       "mode": "0644",
@@ -173,17 +198,17 @@
     {
       "mode": "0644",
       "path": "blossomtales/nxport.json",
-      "sha256": "91b33908ddc9b7afd9786c8135ec2f7a32f1a3887e6d2a5cbe680f30adbd1cd7"
+      "sha256": "19a0952b030aa90b50c186c2fb7b6ac48ff2991f5499ad4b3ca749a33416b5f0"
     },
     {
       "mode": "0644",
       "path": "blossomtales/nxproject.json",
-      "sha256": "9439ccd6be7f26acdaa1eeebd9e7c2ae41adc2c2e1c0af321bd81066ae38fe15"
+      "sha256": "8fbe17d971fbf22068dcade2798b073def261ee26f7fd0804c1f55a41f468e36"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/nxruntime-5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93.nxb",
-      "sha256": "3de476eace93c1fdd1baebc7bc16755a94052ed8952fc6c0310ff55042e28915"
+      "path": "blossomtales/nxruntime-48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788.nxb",
+      "sha256": "1081ff7e4f7fb8e542fcccefa5b8f3dd8ef0b89970c214985558282351d05d03"
     },
     {
       "mode": "0755",
@@ -192,36 +217,36 @@
     },
     {
       "mode": "0644",
-      "path": "blossomtales/port-env.sh",
-      "sha256": "e99f34634809ad2772f09d8959dcc67f507ad9d918ab175d82cf407a704a0851"
+      "path": "blossomtales/port.json",
+      "sha256": "1fd4c3324af1bb0a9f934094b5059a986c839943501d6286df12319e911edade"
     },
     {
       "mode": "0644",
-      "path": "blossomtales/port.json",
-      "sha256": "1fd4c3324af1bb0a9f934094b5059a986c839943501d6286df12319e911edade"
+      "path": "blossomtales/version.txt",
+      "sha256": "f43a0292c674542a2d676a0f4f588a7ffbe1cbac25090df344b12ff1279f7820"
     }
   ],
   "claims": {
-    "adapter_lifecycle_implemented": false,
+    "adapter_lifecycle_implemented": true,
     "deterministic_scaffold": true,
     "physical_support_proven": false,
-    "release_ready": false
+    "release_ready": true
   },
-  "generation_id": "5781bd871bdc8a66e8835d36c234258fa14756555a7916bb943321139475cc93",
+  "generation_id": "48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788",
   "generator": {
     "name": "nxgenerator",
-    "version": "0.3.15"
+    "version": "0.4.5"
   },
-  "project_manifest_sha256": "9439ccd6be7f26acdaa1eeebd9e7c2ae41adc2c2e1c0af321bd81066ae38fe15",
+  "project_manifest_sha256": "8fbe17d971fbf22068dcade2798b073def261ee26f7fd0804c1f55a41f468e36",
   "schema": "nxgenerator-receipt-v1",
   "schema_version": 1,
   "source_pins": {
     "nxbootstrap": {
       "source_files": {
-        "templates/launcher.sh.in": "7dd2e3a363da3f3f70732ec4b7820c3356573c9c21ffada216ce30c4ccd6c329",
-        "tools/generate-port.py": "a1af56b972f9e1fa0cb266c972ff0294343b579c05f00f4ff22d74ec23c59b11"
+        "templates/launcher.sh.in": "c276bfac69667fc9fa649d0ad24f65c0b5e4a268bcaa9fe891582c3bb65aed0b",
+        "tools/generate-port.py": "a6117ed542f5145827a4451d81c2b272f29b74f7958ce54be8c51358ccc46351"
       },
-      "version": "0.7.8"
+      "version": "0.8.2"
     },
     "nxextract": {
       "files": {

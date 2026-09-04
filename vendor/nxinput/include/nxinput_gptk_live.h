@@ -26,6 +26,19 @@ extern "C" {
 #define NXINPUT_GPTK_RUNTIME_MARKER "nxinput-gptk-runtime/3"
 #define NXINPUT_GPTK_EVENT_EVIDENCE_SCHEMA "nxinput-gptk-event-evidence/1"
 #define NXINPUT_GPTK_LIVE_CONTEXT_SOURCE_MAX 95u
+/* 0.11.1 (V5-M1a item 2): the NEUTRAL FLOOR of the vector gesture edge.
+ * A stick vector arrives every frame; the evidence of a gesture is an EDGE:
+ * one "opened" when the vector leaves the neutral disc and one "closed"
+ * when it returns. `x != 0 || y != 0` is NOT neutral detection: a pad whose
+ * axis range is 0..255 normalizes its rest to +0.0039 (asymmetric halves
+ * around the 127.5 midpoint), so with a zero floor the gesture opened at
+ * boot and never closed (Nameless Cat menu on the primary CFW, 2026-09-03; FP2
+ * and Blossom Tales carried the same `!= 0.0f`). The floor is universal:
+ * default 1/64 (covers 0..255 -> 1/255 and 0..65535 -> 1.5e-5 rests), the
+ * adapter may raise it per control to its own deadzone (cursor), never
+ * above 0.9. Radius compare: x*x + y*y <= floor*floor. */
+#define NXINPUT_GPTK_LIVE_VECTOR_NEUTRAL_FLOOR_DEFAULT 0.015625f
+#define NXINPUT_GPTK_LIVE_VECTOR_NEUTRAL_FLOOR_MAX 0.9f
 
 typedef enum nxinput_gptk_live_result {
   /* Native input must receive the event exactly once. */
@@ -45,6 +58,12 @@ typedef int (*nxinput_gptk_live_sink_fn)(void *user, const char *action,
 typedef int (*nxinput_gptk_live_vector_sink_fn)(void *user,
                                                 const char *action,
                                                 float x, float y);
+
+typedef enum nxinput_gptk_live_vector_edge {
+  NXINPUT_GPTK_VECTOR_EDGE_NONE = 0,
+  NXINPUT_GPTK_VECTOR_EDGE_OPENED = 1,  /* left the neutral disc (gesture start) */
+  NXINPUT_GPTK_VECTOR_EDGE_CLOSED = -1  /* returned to neutral (gesture end) */
+} nxinput_gptk_live_vector_edge;
 
 typedef struct nxinput_gptk_live_sink {
   char action[NXINPUT_GPTK_ACTION_MAX + 1u];
@@ -71,6 +90,12 @@ typedef struct nxinput_gptk_live {
   nxinput_gptk_live_sink sinks[NXINPUT_GPTK_MAX_SINKS];
   nxinput_gptk_live_vector_sink vector_sinks[NXINPUT_GPTK_MAX_SINKS];
   char context_source[NXINPUT_GPTK_LIVE_CONTEXT_SOURCE_MAX + 1u];
+  /* 0.11.1: vector gesture edge state (per control bit). */
+  float vector_neutral_floor[NXINPUT_GPTK_CONTROL_COUNT];
+  uint32_t vector_active;          /* controls whose gesture is open */
+  uint32_t vector_released_mask;   /* gestures closed by the last release-all */
+  int last_vector_edge;            /* nxinput_gptk_live_vector_edge of the last feed_vector */
+  unsigned long vector_gestures_opened, vector_gestures_closed;
 } nxinput_gptk_live;
 
 void nxinput_gptk_live_init(nxinput_gptk_live *live,
@@ -111,6 +136,28 @@ nxinput_gptk_live_result nxinput_gptk_live_feed(
     nxinput_gptk_live *live, int control, int pressed, float value);
 nxinput_gptk_live_result nxinput_gptk_live_feed_vector(
     nxinput_gptk_live *live, int control, float x, float y);
+
+/* 0.11.1 vector gesture edge (item 2). The floor is per control, clamped to
+ * [0, NXINPUT_GPTK_LIVE_VECTOR_NEUTRAL_FLOOR_MAX]; NaN/negative -> 0; a
+ * non-stick control or NULL -> -1. init() sets the DEFAULT floor on both
+ * sticks. */
+int nxinput_gptk_live_set_vector_neutral_floor(nxinput_gptk_live *live,
+                                               int control, float floor_r);
+float nxinput_gptk_live_vector_neutral_floor(const nxinput_gptk_live *live,
+                                             int control);
+/* 1 when (x,y) is inside the neutral disc of `control` (radius = floor). */
+int nxinput_gptk_live_vector_is_neutral(const nxinput_gptk_live *live,
+                                        int control, float x, float y);
+/* The edge produced by the LAST nxinput_gptk_live_feed_vector() call:
+ * OPENED when a delivered vector left neutral while no gesture was open,
+ * CLOSED when the gesture returned to neutral (or the decision stopped being
+ * ACTION while a gesture was open), NONE otherwise. */
+nxinput_gptk_live_vector_edge nxinput_gptk_live_last_vector_edge(
+    const nxinput_gptk_live *live);
+int nxinput_gptk_live_vector_active(const nxinput_gptk_live *live, int control);
+/* Bitmask (1 << control) of the gestures that the last clear_context /
+ * release-all closed; the adapter records their "closed" evidence lines. */
+uint32_t nxinput_gptk_live_vector_released_mask(const nxinput_gptk_live *live);
 
 const char *nxinput_gptk_live_result_name(nxinput_gptk_live_result result);
 const char *nxinput_gptk_runtime_marker(void);

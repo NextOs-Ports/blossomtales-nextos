@@ -74,6 +74,7 @@
 
 #include "nxinput_authority.h"
 #include "nxinput_livedb.h"
+#include "nxinput_provider.h"
 #include "nxinput_sdl.h"
 
 #include <stddef.h>
@@ -170,6 +171,27 @@ typedef struct nxinput_sdl_seam_ops {
    * boundary). Values follow nxinput_gptk_face_layout: 0 auto, 1 modern,
    * 2 retro. */
   uint8_t face_layout;
+
+  /*
+   * V5 (0.11.0) tail: the PROVIDER DESCRIPTOR of the SDL this process really
+   * mapped (nxinput_provider.h). `provider_domain` is the ordinal domain the
+   * glue resolved (exported ById API, pinned bytes, or UNDECLARED = UNKNOWN).
+   * The seam prints it as target_domain and NEVER substitutes the upstream
+   * presumption of the major for it. `source_domain_slot`, when non-NULL, is
+   * where the glue's normalizer records the source domain it proved for the
+   * last normalized source (nxinput_sdl_domain), so the receipt reports the
+   * real pair instead of the V4 "joydev-legacy" label.
+   */
+  uint8_t provider_domain;
+  uint8_t provider_method;      /* nxinput_provider_method, evidence only */
+  const uint8_t *source_domain_slot;
+  /* 0.11.4 tail (review 2, N2): 1 when the staging boundary LEFT the CFW's
+   * SDL_GAMECONTROLLERCONFIG line in the environment because the provider
+   * was not decided before init. SDL imported it at USER priority; the
+   * seam then stays in stock mode for the whole run even if the provider
+   * is decided later (in-process measurement) -- API priority can never
+   * outrank the imported line, so "rewritten" would be a lie. */
+  uint8_t env_left_for_stock;
 } nxinput_sdl_seam_ops;
 
 /* 0.8.1 callers end immediately before the additive normalizer callback.
@@ -178,6 +200,8 @@ typedef struct nxinput_sdl_seam_ops {
 #define NXINPUT_SDL_SEAM_OPS_SIZE_0_8_1 \
   offsetof(nxinput_sdl_seam_ops, normalize_source_fn)
 /* 0.9.0 callers end immediately before the 0.10.0 tail. */
+#define NXINPUT_SDL_SEAM_OPS_SIZE_0_10_0 \
+  (offsetof(nxinput_sdl_seam_ops, provider_domain))
 #define NXINPUT_SDL_SEAM_OPS_SIZE_0_9_0 \
   offsetof(nxinput_sdl_seam_ops, livedb_acquire_fn)
 
@@ -197,11 +221,20 @@ typedef struct nxinput_sdl_seam_device {
   /* 0.10.0 tail: the device name, sanitized and bounded, as EVIDENCE for
    * the receipt only. It never selects a mapping, a domain or a layout. */
   char name[64];
+  /* 0.11.1 tail: the joystick DRIVER the provider uses for THIS device
+   * (nxinput_provider_driver): evdev nodes carry measured caps; a HIDAPI
+   * (hidraw) device has no evdev caps and no ordinal table -- the provider
+   * synthesizes its own mapping, so the seam admits it in stock mode
+   * instead of blocking it as "device-record-not-usable". */
+  uint8_t driver;
 } nxinput_sdl_seam_device;
 
 /* 0.9.0 device records end immediately before the evidence name. */
 #define NXINPUT_SDL_SEAM_DEVICE_SIZE_0_9_0 \
   offsetof(nxinput_sdl_seam_device, name)
+/* 0.10.0 device records end immediately before the driver. */
+#define NXINPUT_SDL_SEAM_DEVICE_SIZE_0_10_0 \
+  offsetof(nxinput_sdl_seam_device, driver)
 
 typedef enum nxinput_sdl_seam_result {
   NXINPUT_SDL_SEAM_ADMIT = 0,       /* SDL may announce this device */
@@ -209,7 +242,19 @@ typedef enum nxinput_sdl_seam_result {
   NXINPUT_SDL_SEAM_BLOCK_OPS,       /* the ops table is not usable */
   NXINPUT_SDL_SEAM_BLOCK_IDENTITY,  /* the device record is not usable */
   NXINPUT_SDL_SEAM_BLOCK_AUTHORITY, /* C3 ended in FAIL_EXPLICIT */
-  NXINPUT_SDL_SEAM_BLOCK_COLLISION  /* same GUID, divergent mappings */
+  NXINPUT_SDL_SEAM_BLOCK_COLLISION, /* same GUID, divergent mappings */
+  /* 0.11.1: STOCK MODE. The provider is UNKNOWN (no measured/pinned
+   * table) or the device is driven by HIDAPI: the seam translates
+   * NOTHING, mutates the store with NOTHING external, and lets the
+   * provider behave exactly as stock (its own environment import, its
+   * built-in database, its HIDAPI mapping). The pad is announced; the
+   * receipt says DO_NOT_MUTATE_STORE + passthrough. The ONE exception is
+   * the CFW's own SDL_GAMECONTROLLERCONFIG line that a LEGACY staging call
+   * removed before the descriptor existed: it is handed back to the setter
+   * untranslated (EXISTING_NATIVE_PASSTHROUGH: native to that provider by
+   * provenance), never a file/bundle line. A pad is never muted because
+   * the provider is unknown (review finding 1, 2026-09-03). */
+  NXINPUT_SDL_SEAM_ADMIT_STOCK
 } nxinput_sdl_seam_result;
 
 /* One admitted instance, so a later collision or hotplug can be judged. */
@@ -251,6 +296,10 @@ typedef struct nxinput_sdl_seam {
   unsigned int collisions;
   unsigned int forgotten;
   int initialised;
+  /* V5 (C3): a same-GUID divergent line was refused AT THE SETTER, before
+   * the store could change. Read by admit() to report the collision. */
+  int pending_collision;
+  int32_t pending_collision_instance;
 } nxinput_sdl_seam;
 
 /* Prepare the seam for a process. Safe to call more than once: the first
@@ -312,6 +361,19 @@ typedef struct nxinput_sdl_seam_env_ops {
 int nxinput_sdl_seam_stage_before_init(const nxinput_sdl_seam_env_ops *ops,
                                        char *out, size_t cap,
                                        size_t *staged_len);
+
+/* 0.11.1: staging that KNOWS the provider. The destructive step (removing
+ * SDL_GAMECONTROLLERCONFIG so SDL cannot import it at USER priority) is
+ * only justified when the seam is going to decide a mapping -- i.e. when
+ * the provider descriptor allows a rewrite. With an UNKNOWN provider the
+ * variable is LEFT IN PLACE (`*left_for_stock = 1`, staged_len 0): SDL
+ * imports its own CFW line exactly as stock, and the seam later admits the
+ * pad in stock mode. The legacy call above, which stages blind, is what
+ * used to mute every unpinned CFW (review finding 1). */
+int nxinput_sdl_seam_stage_with_provider(
+    const nxinput_sdl_seam_env_ops *ops,
+    const nxinput_provider_descriptor *provider, char *out, size_t cap,
+    size_t *staged_len, int *left_for_stock);
 
 #ifdef __cplusplus
 }

@@ -26,6 +26,7 @@
 #include <dlfcn.h>
 #include "so_util.h"
 #include "sdv_egl_bridge.h"
+#include "fbo_compat.h"
 #include "etc1.h"
 #include "jni_shim.h"
 
@@ -290,6 +291,16 @@ static struct sdv_trace_attrib sdv_trace_attribs[16];
 static int sdv_gl_trace_enabled(void) {
     const char *value = getenv("SB_GL_TRACE");
     return value && value[0] && value[0] != '0';
+}
+
+/* O present proprio precisa conhecer tanto os FBOs quanto o tamanho das
+ * texturas anexadas. Isso e uma capacidade de apresentacao, nao uma
+ * consequencia do otimizador opcional de texturas. */
+static int sb_fbo_tracking_enabled(void) {
+    const char *track = getenv("SB_FBO_TRACK");
+    const char *present = getenv("SB_PRESENT_FBO");
+    return (track && track[0] && track[0] != '0') ||
+           (present && present[0] && present[0] != '0');
 }
 
 static void sdv_glViewport_trace(int x, int y, int width, int height) {
@@ -575,19 +586,65 @@ static void (*sdv_real_glCompressedTexImage2D)(unsigned int, int, unsigned int,
 static void (*sdv_real_glTexImage2D)(unsigned int, int, int, int, int, int,
                                      unsigned int, unsigned int, const void *);
 
-static const unsigned char *sdv_glGetString_astc(unsigned int pname) {
+static void *sdv_fbo_core_resolve(const char *name, void *userdata) {
+    (void)userdata;
+    return sdv_egl_get_proc_address(name);
+}
+
+static int sdv_extension_present(const char *text, const char *token) {
+    size_t length;
+    const char *at;
+    if (!text || !token || !*token) return 0;
+    length = strlen(token);
+    at = text;
+    while ((at = strstr(at, token)) != NULL) {
+        if ((at == text || at[-1] == ' ') &&
+            (at[length] == '\0' || at[length] == ' ')) return 1;
+        at += length;
+    }
+    return 0;
+}
+
+static const unsigned char *sdv_glGetString_compat(unsigned int pname) {
     const unsigned char *r =
         sdv_real_glGetString ? sdv_real_glGetString(pname) : NULL;
     if (pname == 0x1F03 /* GL_EXTENSIONS */) {
         static char *buf;
-        if (!buf) {
+        static int initialized;
+        if (!initialized) {
             const char *base = r ? (const char *)r : "";
-            buf = malloc(strlen(base) + 64);
-            if (!buf) return r;
-            sprintf(buf, "%s GL_KHR_texture_compression_astc_ldr", base);
-            fprintf(stderr, "[astc] GL_KHR_texture_compression_astc_ldr anunciada\n");
+            const char *astc = "GL_KHR_texture_compression_astc_ldr";
+            size_t cap = strlen(base) + strlen(astc) + 64u;
+            char *candidate;
+            int fbo, changed = 0;
+            initialized = 1;
+            candidate = malloc(cap);
+            if (!candidate) return r;
+            fbo = bt_fbo_compat_extensions(base, candidate, cap,
+                                           sdv_fbo_core_resolve, NULL);
+            if (fbo < 0) {
+                free(candidate);
+                return r;
+            }
+            if (fbo > 0) {
+                changed = 1;
+                fprintf(stderr, "[bt/fbo] %s: GL_EXT_framebuffer_object anunciada (closure=13)\n",
+                        bt_fbo_compat_marker());
+            }
+            if (getenv("SB_ASTC") &&
+                !sdv_extension_present(candidate, astc)) {
+                size_t used = strlen(candidate);
+                snprintf(candidate + used, cap - used, "%s%s",
+                         used ? " " : "", astc);
+                changed = 1;
+                fprintf(stderr, "[astc] GL_KHR_texture_compression_astc_ldr anunciada\n");
+            }
+            if (changed)
+                buf = candidate;
+            else
+                free(candidate);
         }
-        return (const unsigned char *)buf;
+        if (buf) return (const unsigned char *)buf;
     }
     return r;
 }
@@ -1224,6 +1281,29 @@ raw_full_size:
             palette_stream_prune_preload(meta->id);
     }
 }
+
+/* Caminho de rastreamento puro: conserva exatamente o upload original e
+ * guarda apenas a geometria necessaria para eleger o RenderTarget final.
+ * Nao faz downscale, conversao, leitura de pixels nem envolve o hot path de
+ * bind/draw. */
+static void sdv_glTexImage2D_track(unsigned int target, int level, int ifmt,
+        int w, int h, int border, unsigned int fmt, unsigned int type,
+        const void *pix) {
+    if (target == 0x0DE1 && level == 0 && w > 0 && h > 0 &&
+        w <= 65535 && h <= 65535) {
+        unsigned int id = raw_bound_tex2d();
+        RawTexEnt *e = raw_tex_find(id, 1);
+        if (e) {
+            e->id = id;
+            e->w = e->gpu_w = (unsigned short)w;
+            e->h = e->gpu_h = (unsigned short)h;
+            e->scaled = 0;
+            e->qualifies = 0;
+        }
+    }
+    sdv_real_glTexImage2D_raw(target, level, ifmt, w, h, border, fmt, type,
+                              pix);
+}
 static void sdv_glTexSubImage2D_raw(unsigned int target, int level, int x,
         int y, int w, int h, unsigned int fmt, unsigned int type,
         const void *pix) {
@@ -1564,17 +1644,24 @@ void *sdv_dlsym(void *handle, const char *name) {
                         name, p, context_p);
             p = context_p;
         }
-    }
-    /* Hooks ASTC (load-time only; ver bloco astc acima). */
-    /* Os hooks ASTC (incluindo anunciar GL_KHR_texture_compression_astc_ldr no
-     * glGetString) so fazem sentido quando o jogo traz textura ASTC. O
-     * ScourgeBringer nao tem nenhuma: manter o anuncio so levaria o MonoGame a
-     * escolher um caminho comprimido que o Mali-450 nao executa. Opt-in. */
-    if (name && p && getenv("SB_ASTC")) {
-        if (strcmp(name, "glGetString") == 0) {
-            memcpy(&sdv_real_glGetString, &p, sizeof p);
-            return (void *)&sdv_glGetString_astc;
+        if (!p) {
+            void *compat_p = bt_fbo_compat_resolve(
+                name, NULL, sdv_fbo_core_resolve, NULL);
+            if (compat_p) {
+                fprintf(stderr, "[bt/fbo] alias %s -> %s\n", name,
+                        bt_fbo_compat_core_name(name));
+                p = compat_p;
+            }
         }
+    }
+    /* O wrapper de glGetString sempre aplica a fachada FBO, mas só acrescenta
+     * ASTC quando SB_ASTC é opt-in. As duas capacidades permanecem separadas. */
+    if (name && p && strcmp(name, "glGetString") == 0) {
+        memcpy(&sdv_real_glGetString, &p, sizeof p);
+        return (void *)&sdv_glGetString_compat;
+    }
+    /* Hooks ASTC de upload (load-time only; ver bloco astc acima). */
+    if (name && p && getenv("SB_ASTC")) {
         if (strcmp(name, "glCompressedTexImage2D") == 0) {
             memcpy(&sdv_real_glCompressedTexImage2D, &p, sizeof p);
             return (void *)&sdv_glCompressedTexImage2D_astc;
@@ -1584,17 +1671,24 @@ void *sdv_dlsym(void *handle, const char *name) {
             return (void *)&sdv_glCompressedTexSubImage2D_astc;
         }
     }
-    /* Hooks RAW RGBA (load-time only; sem wrapper em bind/draw). */
-    if (name && p && sb_rawscale_min() > 0) {
+    /* Hooks RAW RGBA (load-time only; sem wrapper em bind/draw). O registro
+     * geometrico do present permanece ativo mesmo quando o downscale esta
+     * desligado: as duas responsabilidades nao podem voltar a se acoplar. */
+    if (name && p && (sb_rawscale_min() > 0 ||
+                      sb_fbo_tracking_enabled())) {
         if (strcmp(name, "glTexImage2D") == 0) {
             memcpy(&sdv_real_glTexImage2D_raw, &p, sizeof p);
-            return (void *)&sdv_glTexImage2D_raw;
+            return sb_rawscale_min() > 0
+                ? (void *)&sdv_glTexImage2D_raw
+                : (void *)&sdv_glTexImage2D_track;
         }
-        if (strcmp(name, "glTexSubImage2D") == 0) {
+        if (sb_rawscale_min() > 0 &&
+            strcmp(name, "glTexSubImage2D") == 0) {
             memcpy(&sdv_real_glTexSubImage2D, &p, sizeof p);
             return (void *)&sdv_glTexSubImage2D_raw;
         }
-        if (strcmp(name, "glDeleteTextures") == 0) {
+        if (sb_rawscale_min() > 0 &&
+            strcmp(name, "glDeleteTextures") == 0) {
             memcpy(&sdv_real_glDeleteTextures, &p, sizeof p);
             return (void *)&sdv_glDeleteTextures_raw;
         }
@@ -1608,7 +1702,7 @@ void *sdv_dlsym(void *handle, const char *name) {
      * FBO realmente gerados pelo jogo. Evita envolver glBind/draw no hot path
      * e permite ao bridge inspecionar os dois render targets do menu sem
      * tentar IDs arbitrarios no driver Mali. */
-    if (name && p && getenv("SB_FBO_TRACK")) {
+    if (name && p && sb_fbo_tracking_enabled()) {
         if (strcmp(name, "glGenFramebuffers") == 0 ||
             strcmp(name, "glGenFramebuffersEXT") == 0 ||
             strcmp(name, "glGenFramebuffersOES") == 0) {

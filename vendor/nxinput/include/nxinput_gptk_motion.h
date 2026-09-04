@@ -64,7 +64,7 @@ int nxinput_gptk_cursor_step(const nxinput_gptk_cursor_tuning *tuning,
  *
  * authority == NXINPUT_GPTK_AUTHORITY_NATIVE: identity pass-through with
  * deadzone treated as 0 -- the game's NATIVE menu governs deadzone,
- * sensitivity and inversion, and NextOS applies nothing on top.
+ * sensitivity and inversion, and the framework host applies nothing on top.
  *
  * Returns 0 with the result in out_x/out_y; returns -1 with both outputs
  * zeroed on NULL arguments or out-of-bounds tuning (fail closed). */

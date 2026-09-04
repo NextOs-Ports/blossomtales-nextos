@@ -15,15 +15,15 @@
     "imports": []
   },
   "graphics": {
+    "adapter": "nxgl_graphics_contract_adapter",
+    "adopt_single_channel": false,
     "api": "gles",
     "drawable_ready_timeout_ms": 15000,
     "profile": "es",
     "shader_dialect": "essl100",
     "uses_gl": true,
     "version": "2.0",
-    "version_policy": "minimum",
-    "adapter": "nxgl_graphics_contract_adapter",
-    "adopt_single_channel": false
+    "version_policy": "minimum"
   },
   "imports": [
     "libmonosgen-2.0.so",
@@ -166,6 +166,11 @@
       "right_stick_cursor": "P1 native (R3 = click when the arrow is visible, BUTTON_THUMBR otherwise)"
     }
   },
+  "input_controller_profiles": {
+    "bundle": "controllers.nxb",
+    "enabled": true,
+    "sha256": "10feaf41cf8ee6203cf05c4202119e5bdba2dfb22db41e89ab31a5a9bd6eff13"
+  },
   "input_sdl3_portmaster": {
     "enabled": false,
     "private_sdl3_sha256": ""
@@ -215,6 +220,8 @@
     "source_evidence": [
       "src/main.c",
       "src/bt_input.c",
+      "src/fbo_compat.c",
+      "src/imports.gen.c",
       "src/sdv_egl_bridge.c"
     ]
   },
@@ -248,20 +255,5 @@
       "src/bt_input.c",
       "src/main.c sb_pause_and_exit"
     ]
-  },
-  "input_controller_profiles": {
-    "bundle": "controllers.nxb",
-    "enabled": true,
-    "face_layout_variants": {
-      "modern": {
-        "bundle": "controllers-modern.nxb",
-        "sha256": "bfce688bb383cf2d239193ea3c4b3ea57b8bb28b06f46955b71bc0561ada139b"
-      },
-      "retro": {
-        "bundle": "controllers-retro.nxb",
-        "sha256": "3429bb94a48930b8cc9abb768957815138c686fd2436aca6eadadb5b6a3359f0"
-      }
-    },
-    "sha256": "10feaf41cf8ee6203cf05c4202119e5bdba2dfb22db41e89ab31a5a9bd6eff13"
   }
 }

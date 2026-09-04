@@ -1,0 +1,146 @@
+{
+  "components": [
+    {
+      "mode": "0755",
+      "path": "Blossom Tales.sh",
+      "role": "launcher",
+      "sha256": "b05eb45a7f258540560271c75fed660f809f268f318d57acd065957ab1989c86"
+    },
+    {
+      "mode": "0644",
+      "path": "nxport.json",
+      "role": "nxport",
+      "sha256": "19a0952b030aa90b50c186c2fb7b6ac48ff2991f5499ad4b3ca749a33416b5f0"
+    },
+    {
+      "mode": "0755",
+      "path": "blossomtales-nextos",
+      "role": "executable",
+      "sha256": "148a00ebba44b683ab13146df865574a7f961d292cfab329cf0a75ae44161f74"
+    },
+    {
+      "mode": "0644",
+      "path": "adapter-env.sh",
+      "role": "runtime-hook",
+      "sha256": "05847c5e985ba0f93d75ffb26452d663126b313d58de174f57de43b3e2155574"
+    },
+    {
+      "mode": "0644",
+      "path": "extractor.json",
+      "role": "nxextract-recipe",
+      "sha256": "c5fffb63197a6715f4dd53c0e2c14dd316500e1c92871f7db63101d32a5576e4"
+    },
+    {
+      "mode": "0644",
+      "path": "nxextract/nxextract.py",
+      "role": "nxextract-engine",
+      "sha256": "e59a1e525ea475635c2e8f51bff3c6fff8cdaad406c158e3dad011cdd96876a7"
+    },
+    {
+      "mode": "0644",
+      "path": "nxextract/run-extractor.sh",
+      "role": "nxextract-runner",
+      "sha256": "583d046d4d95a2d15d66f0aee35911097698b34b0bd33732b2a517e6408bf9d0"
+    },
+    {
+      "mode": "0644",
+      "path": "nxextract/nxextract-runtime-env.sh",
+      "role": "nxextract-runtime-env",
+      "sha256": "332919a9960d4317563b647f9932d1a4367da147a425fe2f78eafd706f01563f"
+    },
+    {
+      "mode": "0755",
+      "path": "nxextract/nxextract-ui",
+      "role": "nxextract-ui",
+      "sha256": "8e4a68ae0a611096d23b04628b4f2e8b5cf34755fe9b71d134bc0d7ea6ccf987"
+    },
+    {
+      "mode": "0755",
+      "path": "nxsplash-nextos",
+      "role": "nxsplash",
+      "sha256": "d85d896a906a778c9af250e5617d45d085a98b18552cb0254addbbc626036c97"
+    }
+  ],
+  "generation_id": "48a010c60f8347f51800236396f10a3152a3c85a8fe316f1173762441b1ff788",
+  "identity_basis": {
+    "components": [
+      {
+        "mode": "0755",
+        "path": "Blossom Tales.sh",
+        "role": "launcher",
+        "sha256": "b0a334ebb5285fa2e45d363eac8a5bbcd1cf0b1f72208afb02e6d6a7806941f3"
+      },
+      {
+        "mode": "0644",
+        "path": "nxport.json",
+        "role": "nxport",
+        "sha256": "19a0952b030aa90b50c186c2fb7b6ac48ff2991f5499ad4b3ca749a33416b5f0"
+      },
+      {
+        "mode": "0755",
+        "path": "blossomtales-nextos",
+        "role": "executable",
+        "sha256": "148a00ebba44b683ab13146df865574a7f961d292cfab329cf0a75ae44161f74"
+      },
+      {
+        "mode": "0644",
+        "path": "adapter-env.sh",
+        "role": "runtime-hook",
+        "sha256": "05847c5e985ba0f93d75ffb26452d663126b313d58de174f57de43b3e2155574"
+      },
+      {
+        "mode": "0644",
+        "path": "extractor.json",
+        "role": "nxextract-recipe",
+        "sha256": "c5fffb63197a6715f4dd53c0e2c14dd316500e1c92871f7db63101d32a5576e4"
+      },
+      {
+        "mode": "0644",
+        "path": "nxextract/nxextract.py",
+        "role": "nxextract-engine",
+        "sha256": "e59a1e525ea475635c2e8f51bff3c6fff8cdaad406c158e3dad011cdd96876a7"
+      },
+      {
+        "mode": "0644",
+        "path": "nxextract/run-extractor.sh",
+        "role": "nxextract-runner",
+        "sha256": "583d046d4d95a2d15d66f0aee35911097698b34b0bd33732b2a517e6408bf9d0"
+      },
+      {
+        "mode": "0644",
+        "path": "nxextract/nxextract-runtime-env.sh",
+        "role": "nxextract-runtime-env",
+        "sha256": "332919a9960d4317563b647f9932d1a4367da147a425fe2f78eafd706f01563f"
+      },
+      {
+        "mode": "0755",
+        "path": "nxextract/nxextract-ui",
+        "role": "nxextract-ui",
+        "sha256": "8e4a68ae0a611096d23b04628b4f2e8b5cf34755fe9b71d134bc0d7ea6ccf987"
+      },
+      {
+        "mode": "0755",
+        "path": "nxsplash-nextos",
+        "role": "nxsplash",
+        "sha256": "d85d896a906a778c9af250e5617d45d085a98b18552cb0254addbbc626036c97"
+      }
+    ],
+    "launcher_preimage_sha256": "b0a334ebb5285fa2e45d363eac8a5bbcd1cf0b1f72208afb02e6d6a7806941f3",
+    "nxbootstrap": {
+      "generator_sha256": "a6117ed542f5145827a4451d81c2b272f29b74f7958ce54be8c51358ccc46351",
+      "launcher_template_sha256": "c276bfac69667fc9fa649d0ad24f65c0b5e4a268bcaa9fe891582c3bb65aed0b",
+      "version": "0.8.2"
+    },
+    "nxport_sha256": "19a0952b030aa90b50c186c2fb7b6ac48ff2991f5499ad4b3ca749a33416b5f0",
+    "nxsplash": {
+      "architecture": "aarch64",
+      "sha256": "d85d896a906a778c9af250e5617d45d085a98b18552cb0254addbbc626036c97",
+      "version": "0.1.2"
+    },
+    "runtime_records_sha256": "b6955178b69dcafe836c3c290b8a14db14f4375f9b88e8243591002f9e666986",
+    "schema": "org.nextos.nxruntime.generation-identity",
+    "schema_version": 2
+  },
+  "schema": "nxruntime-generation-v2",
+  "schema_version": 2
+}

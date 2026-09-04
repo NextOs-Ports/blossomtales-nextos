@@ -157,7 +157,7 @@ int nxinput_gptk_camera_transform(const nxinput_gptk_camera_tuning *tuning,
 
   if (tuning->authority == (uint8_t)NXINPUT_GPTK_AUTHORITY_NATIVE) {
     /* Native authority: the game's own menu governs deadzone, sensitivity
-     * and inversion. NextOS applies NOTHING (deadzone treated as 0) so
+     * and inversion. the framework host applies NOTHING (deadzone treated as 0) so
      * tuning is never applied twice. */
     *out_x = axis_x;
     *out_y = axis_y;

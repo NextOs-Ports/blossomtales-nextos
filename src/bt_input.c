@@ -31,6 +31,7 @@
 #include "nxinput_padset.h"
 #include "nxinput_sdl_seam.h"
 #include "sdv_egl_bridge.h"
+#include "present_policy.h"
 
 /* ===== Constantes Android consumidas pelo MonoGame ====================== */
 #define AKEY_BACK 4
@@ -187,13 +188,8 @@ enum { input_diag = 0 };
 #endif
 
 /* ===== Costura C6 antes de qualquer SDL_Init ============================ */
-static const char *env_get(void *u, const char *n) { (void)u; return getenv(n); }
-static int env_unset(void *u, const char *n) { (void)u; return unsetenv(n); }
-static int env_sdl_was_init(void *u) { (void)u; return sdl.was_init(0) != 0; }
-
 static int stage_seam_before_init(void)
 {
-    nxinput_sdl_seam_env_ops env;
     size_t staged_len = 0;
     if (!getenv("NXC6_SEAM")) {
         fprintf(stderr, "[bt/input] NXC6 seam: not adopted for this run (NXC6_SEAM absent); stock SDL behaviour\n");
@@ -203,19 +199,14 @@ static int stage_seam_before_init(void)
         fprintf(stderr, "[bt/input] NXC6 seam: this SDL cannot name the device node (pre-2.24); staying native\n");
         return 0;
     }
-    memset(&env, 0, sizeof env);
-    env.api_version = NXINPUT_SDL_SEAM_API_VERSION;
-    env.struct_size = sizeof env;
-    env.getenv_fn = env_get;
-    env.unsetenv_fn = env_unset;
-    env.sdl_was_init_fn = env_sdl_was_init;
-    int rc = nxinput_sdl_seam_stage_before_init(&env, staged_mapping, sizeof staged_mapping, &staged_len);
-    if (rc != 0) {
+    /* V5: a própria costura identifica a SDL realmente mapeada antes de
+     * decidir. Provider desconhecido deixa SDL_GAMECONTROLLERCONFIG no lugar
+     * para a importação stock do CFW; provider provado encena os bytes para a
+     * tradução tipada. Nunca decidir por nome do firmware. */
+    int rc = nxc6_stage_before_init(staged_mapping, sizeof staged_mapping,
+                                    &staged_len);
+    if (rc < 0) {
         fprintf(stderr, "[bt/input] NXC6 seam: staging failed before the joystick init (rc=%d); refusing to guess\n", rc);
-        return -1;
-    }
-    if (staged_len > 0 && setenv("NXC6_STAGED_MAPPING", staged_mapping, 1) != 0) {
-        fprintf(stderr, "[bt/input] NXC6 seam: could not hand the staged mapping to the seam\n");
         return -1;
     }
     seam_adopted = 1;
@@ -223,8 +214,9 @@ static int stage_seam_before_init(void)
     fprintf(stderr, "[bt/input] NXC6 seam: port bundle %s (layout=%s)\n",
             declared > 0 ? getenv("NXCONTROLLER_PROFILES") : declared == 0 ? "(none shipped)" : "(declaration failed)",
             nxinput_gptk_face_layout_name(bt_gptk_face_layout()));
-    fprintf(stderr, "[bt/input] NXC6 seam: staged=%zu bytes env_still_set=%d receipt=%s\n",
-            staged_len, getenv("SDL_GAMECONTROLLERCONFIG") != NULL,
+    fprintf(stderr, "[bt/input] NXC6 seam: result=%s staged=%zu bytes env_still_set=%d receipt=%s\n",
+            rc == 1 ? "left-for-stock" : "staged", staged_len,
+            getenv("SDL_GAMECONTROLLERCONFIG") != NULL,
             getenv("NXC6_RECEIPT") ? getenv("NXC6_RECEIPT") : "(none)");
     return 0;
 }
@@ -546,8 +538,13 @@ static double mono_seconds(void)
 
 static void send_touch(int action, float x, float y)
 {
+    float sx = x, sy = y;
     if (!cb_touch || !touch_event) return;
-    jni_set_motion_event(touch_event, action, x, y);
+    /* V5 / FV5: the cursor lives in drawable pixels; the game receives the
+     * point through the INVERSE of the present content rect (letterbox), so
+     * a tap on the visible image lands on the same image pixel. */
+    (void)sb_present_policy_touch(x, y, &sx, &sy);
+    jni_set_motion_event(touch_event, action, sx, sy);
     cb_touch(jni_env, jni_view, jni_view, touch_event);
 }
 

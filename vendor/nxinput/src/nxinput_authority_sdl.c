@@ -18,8 +18,12 @@ static const char *sdl_getenv(void *userdata, const char *name) {
 
 static int sdl_read_text(void *userdata, const char *path, char *out,
                          size_t cap) {
-  SDL_RWops *stream;
-  Sint64 size;
+  /* 0.11.2: plain stdio. SDL_RWsize/SDL_RWread/SDL_RWclose are real entry
+   * points only since SDL 2.0.10, above the universal floor 2.0.4
+   * (nx-sdl-symbol-floor/1); the effect (read one text file whole) needs
+   * nothing of SDL. */
+  FILE *stream;
+  long size;
   size_t read;
 
   (void)userdata;
@@ -27,18 +31,20 @@ static int sdl_read_text(void *userdata, const char *path, char *out,
     return -1;
   }
   out[0] = '\0';
-  stream = SDL_RWFromFile(path, "rb");
+  stream = fopen(path, "rb");
   if (stream == NULL) {
     return -1;
   }
-  size = SDL_RWsize(stream);
-  if (size < 0 || (Uint64)size >= (Uint64)cap) {
-    (void)SDL_RWclose(stream);
+  if (fseek(stream, 0L, SEEK_END) != 0 || (size = ftell(stream)) < 0 ||
+      (unsigned long)size >= (unsigned long)cap ||
+      fseek(stream, 0L, SEEK_SET) != 0) {
+    (void)fclose(stream);
     return -1;
   }
-  read = SDL_RWread(stream, out, 1u, (size_t)size);
-  (void)SDL_RWclose(stream);
+  read = fread(out, 1u, (size_t)size, stream);
+  (void)fclose(stream);
   if (read != (size_t)size) {
+    out[0] = '\0';
     return -1;
   }
   out[read] = '\0';

@@ -4,6 +4,7 @@
  * Este passe opt-in apresenta o último FBO full-size com um shader ES2 mínimo.
  */
 #include "present_fbo.h"
+#include "present_policy.h"
 #include "sdv_egl_bridge.h"
 
 #include <stdint.h>
@@ -16,6 +17,9 @@ extern int sdv_gl_texture_dimensions(unsigned int id, int *w, int *h);
 
 typedef void (*GetIntegervFn)(unsigned int, int *);
 typedef void (*GetBooleanvFn)(unsigned int, unsigned char *);
+typedef void (*GetFloatvFn)(unsigned int, float *);
+typedef void (*ClearFn)(unsigned int);
+typedef void (*ClearColorFn)(float, float, float, float);
 typedef unsigned char (*IsEnabledFn)(unsigned int);
 typedef void (*EnableDisableFn)(unsigned int);
 typedef unsigned char (*IsFramebufferFn)(unsigned int);
@@ -60,6 +64,10 @@ typedef unsigned int (*GetErrorFn)(void);
 
 static GetIntegervFn p_get_integerv;
 static GetBooleanvFn p_get_booleanv;
+static GetFloatvFn p_get_floatv;
+static ClearFn p_clear;
+static ClearColorFn p_clear_color;
+static int source_width, source_height;
 static IsEnabledFn p_is_enabled;
 static EnableDisableFn p_enable, p_disable;
 static IsFramebufferFn p_is_framebuffer;
@@ -113,6 +121,9 @@ static int resolve_symbols(void)
     symbols_resolved = 1;
     RESOLVE(p_get_integerv, "glGetIntegerv");
     RESOLVE(p_get_booleanv, "glGetBooleanv");
+    RESOLVE(p_get_floatv, "glGetFloatv");
+    RESOLVE(p_clear, "glClear");
+    RESOLVE(p_clear_color, "glClearColor");
     RESOLVE(p_is_enabled, "glIsEnabled");
     RESOLVE(p_enable, "glEnable");
     RESOLVE(p_disable, "glDisable");
@@ -249,7 +260,8 @@ static void update_source(void)
     struct present_candidate candidates[32];
     int candidate_count = 0;
     int count = sdv_gl_copy_known_framebuffers(ids, 32);
-    if (count < 4) return;
+    int known_set_changed = count != last_known_count;
+    if (!sb_present_fbo_known_set_ready(count)) return;
     if (count == last_known_count && source_fbo &&
         p_is_framebuffer(source_fbo)) return;
 
@@ -257,6 +269,7 @@ static void update_source(void)
     unsigned int previous_fbo = source_fbo;
     unsigned int forced_fbo = forced_source_fbo();
     unsigned int fallback_fbo = 0, fallback_texture = 0;
+    int fallback_w = 0, fallback_h = 0, forced_w = 0, forced_h = 0;
     unsigned long long fallback_area = 0;
     p_get_integerv(0x8CA6u /* FRAMEBUFFER_BINDING */, &old_fbo);
     last_known_count = count;
@@ -289,18 +302,23 @@ static void update_source(void)
                 fallback_area = area;
                 fallback_fbo = candidate->fbo;
                 fallback_texture = candidate->texture;
+                fallback_w = width; fallback_h = height;
             }
             if (forced_fbo == candidate->fbo) {
                 source_fbo = candidate->fbo;
                 source_texture = candidate->texture;
+                forced_w = width; forced_h = height;
             }
         }
     }
+    source_width = forced_w; source_height = forced_h;
     if (!source_texture) {
         source_fbo = fallback_fbo;
         source_texture = fallback_texture;
+        source_width = fallback_w; source_height = fallback_h;
     }
-    if (getenv("SB_PRESENT_TRACE")) {
+    if (getenv("SB_PRESENT_TRACE") &&
+        (known_set_changed || source_fbo != previous_fbo)) {
         fprintf(stderr,
                 "[sdv-egl] present-fbo candidatos=%d conhecidos=%d force=%u",
                 candidate_count, count, forced_fbo);
@@ -424,10 +442,30 @@ void sb_present_fullsize_fbo(int backbuffer_width, int backbuffer_height)
 
     if (!present_program && !init_present_program()) goto restore;
     p_bind_framebuffer(0x8D40u /* FRAMEBUFFER */, 0);
-    p_viewport(0, 0, backbuffer_width, backbuffer_height);
     for (unsigned int i = 0; i < sizeof caps / sizeof caps[0]; ++i)
         p_disable(caps[i]);
     p_color_mask(1, 1, 1, 1);
+    /* V5 / FV5: the owner's aspect policy decides the CONTENT RECT on the
+     * real drawable; `preserve` letterboxes (opaque black bars cleared on
+     * the whole drawable first), `stretch`/`engine` keep the full quad.
+     * The same rect transforms cursor/touch (sb_present_policy_touch). */
+    {
+        const nxcompat_video_decision *d =
+            sb_present_policy_decide(source_width, source_height,
+                                     backbuffer_width, backbuffer_height);
+        if (d && d->effective == NXCOMPAT_VIDEO_ASPECT_PRESERVE &&
+            (d->bar_left || d->bar_right || d->bar_top || d->bar_bottom)) {
+            float old_clear[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+            p_get_floatv(0x0C22u /* COLOR_CLEAR_VALUE */, old_clear);
+            p_viewport(0, 0, backbuffer_width, backbuffer_height);
+            p_clear_color(0.0f, 0.0f, 0.0f, 1.0f);
+            p_clear(0x00004000u /* COLOR_BUFFER_BIT */);
+            p_clear_color(old_clear[0], old_clear[1], old_clear[2], old_clear[3]);
+            p_viewport(d->content.x, d->content.y, d->content.w, d->content.h);
+        } else {
+            p_viewport(0, 0, backbuffer_width, backbuffer_height);
+        }
+    }
     p_use_program(present_program);
     p_active_texture(0x84C0u /* TEXTURE0 */);
     p_bind_texture(0x0DE1u /* TEXTURE_2D */, source_texture);

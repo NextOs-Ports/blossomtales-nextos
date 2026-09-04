@@ -2,52 +2,85 @@
 # Formato próprio do NextOS. NÃO é gptokeyb: nunca vira teclado.
 # NextOS own format. NOT gptokeyb: never becomes a keyboard.
 #
-# Mapa estático dos controles nativos. Este port NÃO carrega edições deste
-# arquivo em runtime; SDL/PortMaster permanece a fonte dos controles.
-# Static map of native controls. This port does NOT load edits from this
-# file at runtime; SDL/PortMaster remains the controls source.
+# Edite as ações à direita para trocar os controles. A lista de ações
+# válidas vem do adapter-contract.json do port. Este arquivo é SEU:
+# atualizações do port nunca sobrescrevem a sua cópia editada.
+# Edit the actions on the right to remap. Valid actions come from the
+# port's adapter-contract.json. This file is YOURS: port updates never
+# overwrite your edited copy.
 
-format = NEXTOS_CONTROLLERS/3
+format = NEXTOS_CONTROLLERS/4
 port = blossomtales
 
-FACE_LAYOUT = auto
+CONTROL_STANDARD = xbox
+GLYPH_STYLE = xbox
+AUTHORITY = nextos
+CONTEXT_POLICY = unified
 
-[menu]
-A = menu.accept
-B = menu.back
-X = player.use_tool
-Y = player.open_menu
-L1 = player.select_previous
-R1 = player.select_next
-L2 = null
-R2 = null
-L3 = player.open_journal
-R3 = player.open_map
-START = system.pause
-SELECT = system.back
-UP = menu.navigate_up
-DOWN = menu.navigate_down
-LEFT = menu.navigate_left
-RIGHT = menu.navigate_right
-LEFT_STICK = null
-RIGHT_STICK = null
+# Positional Xbox surface: A = south, B = east, X = west, Y = north.
+# One base map for title/menu/gameplay; [override.*] only where the game proved a screen diverges.
+[base]
+A = action:player.attack
+B = action:player.use_item
+X = action:player.use_tool
+Y = action:player.open_menu
+L1 = action:player.select_previous
+R1 = action:player.select_next
+L3 = action:player.open_journal
+R3 = native
+START = action:system.pause
+SELECT = action:system.back
+GUIDE = native
+UP = native
+DOWN = native
+LEFT = native
+RIGHT = native
 
-[gameplay]
-A = player.attack
-B = player.use_item
-X = player.use_tool
-Y = player.open_menu
-L1 = player.select_previous
-R1 = player.select_next
-L2 = null
-R2 = null
-L3 = player.open_journal
-R3 = player.open_map
-START = system.pause
-SELECT = system.back
-UP = player.move_up
-DOWN = player.move_down
-LEFT = player.move_left
-RIGHT = player.move_right
-LEFT_STICK = null
-RIGHT_STICK = null
+[override.menu]
+A = action:menu.accept
+B = action:menu.back
+X = native
+Y = native
+L1 = native
+R1 = native
+L3 = native
+START = native
+SELECT = native
+
+[stick.left]
+mode = vector
+vector = native
+up = null
+down = null
+left = null
+right = null
+enter_threshold = 0.55
+exit_threshold = 0.40
+diagonal = 8way
+tie_break = horizontal
+
+[stick.right]
+mode = vector
+vector = native
+up = null
+down = null
+left = null
+right = null
+enter_threshold = 0.55
+exit_threshold = 0.40
+diagonal = 8way
+tie_break = horizontal
+
+[trigger.left]
+mode = analog
+analog = native
+digital = null
+enter_threshold = 0.55
+exit_threshold = 0.40
+
+[trigger.right]
+mode = analog
+analog = native
+digital = null
+enter_threshold = 0.55
+exit_threshold = 0.40

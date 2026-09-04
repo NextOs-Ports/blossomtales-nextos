@@ -2,6 +2,8 @@
 #ifndef NXC6_GLUE_H
 #define NXC6_GLUE_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,6 +54,32 @@ void nxc6_forget(int instance_id);
  * port ships none (benign -- the caller MUST NOT treat it as an error),
  * -1 on invalid input or a failed setenv. */
 int nxc6_declare_port_bundle_for_layout(const char *gamedir, int face_layout);
+
+/* 0.11.1: staging that KNOWS the provider -- the ONE call a port makes
+ * before SDL_Init instead of nxinput_sdl_seam_stage_before_init() by hand.
+ * It resolves the provider descriptor of the SDL this process maps, and:
+ *   - provider with a table (measured/pinned/declared): stages
+ *     SDL_GAMECONTROLLERCONFIG out of the environment into `out`, exports
+ *     NXC6_STAGED_MAPPING, returns 0 (`*staged_len` > 0), or 0 with 0 when
+ *     the variable was absent;
+ *   - provider UNKNOWN: LEAVES the variable in place so the CFW's own SDL
+ *     imports its own line exactly as stock, returns 1 (the admission
+ *     later runs in stock mode; the pad is never muted);
+ *   - -1 on error (SDL already initialised, overflow, unsetenv failure).
+ * One NXC6-STAGE receipt line is emitted either way. */
+int nxc6_stage_before_init(char *out, size_t cap, size_t *staged_len);
+/* 1 when the resolved provider allows a rewrite (has a table). */
+int nxc6_provider_allows_rewrite(void);
+
+/* V5 (5.1 static provider): an engine whose SDL is BUILT IN declares, before
+ * its SDL init, the entry point of that SDL (the address the engine itself
+ * links to), the manifest id of the pinned source it was built from and the
+ * ordinal domain measured for that source. The glue probes the entry (must
+ * resolve to the main program), records the executable's sha256/Build ID and
+ * publishes the descriptor with method=declared-static-source. Refused (-1,
+ * provider stays UNKNOWN) when the entry lives in a DSO. Call at most once. */
+int nxc6_declare_static_provider(const void *sdl_entry, const char *pin_id,
+                                 int domain);
 
 /* Legacy 0.9.0 spelling; means FACE_LAYOUT auto. */
 int nxc6_declare_port_bundle(const char *gamedir);

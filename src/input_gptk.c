@@ -11,9 +11,14 @@
 #include "input_gptk.h"
 
 #include "nxinput_gptk.h"
+#include "nxinput_gptk4.h"
+#include "nxinput_gptk4_bridge.h"
 #include "nxinput_gptk_live.h"
 #include "nxinput_gptk_loader.h"
 #include "nxinput_gptk_preinit.h"
+
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -46,19 +51,25 @@ typedef char bt_assert_mask_fits[NXINPUT_GPTK_CONTROL_COUNT <= 32 ? 1 : -1];
 
 /* Allowlist = input.actions do adapter-contract.json deste port.  O loader
  * rejeita qualquer ação fora dela (NXI1001, fail-closed). */
-static const char *const bt_allowed_actions[] = {
-    "menu.accept",
-    "menu.back",
-    "player.attack",
-    "player.open_journal",
-    "player.open_menu",
-    "player.select_next",
-    "player.select_previous",
-    "player.use_item",
-    "player.use_tool",
-    "system.back",
-    "system.pause",
+/* NEXTOS_CONTROLLERS/4 (V5, nxinput 0.11.0): adapter contract for the owner
+ * file; the schema-4 owner is projected onto the live V3 dispatch by
+ * nxinput_gptk4_bridge (sinks and contexts unchanged). */
+static const nxinput_gptk4_action_decl bt_gptk4_actions[] = {
+    {"menu.accept", NXINPUT_GPTK4_V_DIGITAL},
+    {"menu.back", NXINPUT_GPTK4_V_DIGITAL},
+    {"player.attack", NXINPUT_GPTK4_V_DIGITAL},
+    {"player.open_journal", NXINPUT_GPTK4_V_DIGITAL},
+    {"player.open_menu", NXINPUT_GPTK4_V_DIGITAL},
+    {"player.select_next", NXINPUT_GPTK4_V_DIGITAL},
+    {"player.select_previous", NXINPUT_GPTK4_V_DIGITAL},
+    {"player.use_item", NXINPUT_GPTK4_V_DIGITAL},
+    {"player.use_tool", NXINPUT_GPTK4_V_DIGITAL},
+    {"system.back", NXINPUT_GPTK4_V_DIGITAL},
+    {"system.pause", NXINPUT_GPTK4_V_DIGITAL},
 };
+static const char *const bt_gptk4_contexts[] = {"menu", "cursor"};
+static nxinput_gptk4 bt_gptk4_map;
+static nxinput_gptk4_bridge_receipt bt_gptk4_receipt;
 
 typedef struct bt_sink_entry {
     char action[NXINPUT_GPTK_ACTION_MAX + 1u];
@@ -114,27 +125,56 @@ int bt_gptk_preinit(const char *gamedir)
         return 0;
     memset(&bt_preinit, 0, sizeof bt_preinit);
     bt_preinit_done = 1;
-    int rc = nxinput_gptk_preinit_load(
-        gamedir && *gamedir ? gamedir : ".", bt_allowed_actions,
-        sizeof bt_allowed_actions / sizeof *bt_allowed_actions, &bt_preinit);
-    if (rc != 0) {
-        fprintf(stderr, "[bt/gptk] preinit: argumentos inválidos (rc=%d)\n",
-                rc);
-        bt_preinit.loaded = 0;
-        return -1;
-    }
+    bt_preinit.api_version = 1u;
+    bt_preinit.struct_size = sizeof bt_preinit;
+    bt_preinit.receipt.api_version = 1u;
+    const char *dir = gamedir && *gamedir ? gamedir : ".";
+    int owner_fd = open(dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    int defaults_fd = owner_fd >= 0
+        ? openat(owner_fd, "defaults", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        : -1;
+    nxinput_gptk4_contract contract;
+    memset(&contract, 0, sizeof contract);
+    contract.actions = bt_gptk4_actions;
+    contract.count = sizeof bt_gptk4_actions / sizeof *bt_gptk4_actions;
+    contract.contexts = bt_gptk4_contexts;
+    contract.context_count = sizeof bt_gptk4_contexts / sizeof *bt_gptk4_contexts;
+    int rc = nxinput_gptk4_load_project_at(owner_fd, defaults_fd, &contract,
+                                           &bt_gptk4_map, &bt_preinit.map,
+                                           &bt_gptk4_receipt);
+    if (defaults_fd >= 0)
+        close(defaults_fd);
+    if (owner_fd >= 0)
+        close(owner_fd);
     char json[1024];
-    if (nxinput_gptk_load_receipt_json(&bt_preinit.receipt, json,
-                                       sizeof json) == 0) {
+    if (nxinput_gptk4_bridge_receipt_json(&bt_gptk4_receipt, json,
+                                          sizeof json) == 0) {
         fprintf(stderr, "[bt/gptk] selection receipt: %s\n", json);
         bt_receipt_line(json);
     }
+    bt_preinit.loaded = rc == 0;
+    bt_preinit.rc = bt_gptk4_receipt.rc;
+    bt_preinit.face_layout = 0;
+    bt_preinit.receipt.source = (uint8_t)(
+        bt_gptk4_receipt.source == NXINPUT_GPTK4_SRC_OWNER ? NXINPUT_GPTK_LOAD_OWNER
+        : bt_gptk4_receipt.source == NXINPUT_GPTK4_SRC_DEFAULT
+            ? (bt_gptk4_receipt.owner_rejected ? NXINPUT_GPTK_LOAD_DEFAULT_OWNER_REJECTED
+                                               : NXINPUT_GPTK_LOAD_DEFAULT_OWNER_MISSING)
+            : NXINPUT_GPTK_LOAD_NONE);
+    bt_preinit.receipt.owner_present = bt_gptk4_receipt.owner_present;
+    bt_preinit.receipt.owner_error_code = bt_gptk4_receipt.owner_rejected ? bt_gptk4_receipt.rc : 0;
+    bt_preinit.receipt.default_error_code = bt_gptk4_receipt.default_rejected ? bt_gptk4_receipt.rc : 0;
+    bt_preinit.receipt.selected_gptk_schema = NXINPUT_GPTK_SCHEMA_V4;
+    snprintf(bt_preinit.receipt.selected_sha256,
+             sizeof bt_preinit.receipt.selected_sha256, "%s",
+             bt_gptk4_receipt.sha256);
     if (!bt_preinit.loaded) {
         fprintf(stderr,
-                "[bt/gptk] NXI%04d: sem NEXTOSCONTROLLERS válido "
-                "(owner_err=%d default_err=%d) — port permanece nativo\n",
-                bt_preinit.rc, bt_preinit.receipt.owner_error_code,
-                bt_preinit.receipt.default_error_code);
+                "[bt/gptk] NXI%04d: sem NEXTOSCONTROLLERS/4 válido "
+                "(%s:%u:%u %s) — port permanece nativo\n",
+                bt_gptk4_receipt.rc, "NEXTOSCONTROLLERS.gptk",
+                bt_gptk4_receipt.line, bt_gptk4_receipt.column,
+                bt_gptk4_receipt.what);
         return 0;
     }
     /* Objeto vivo nasce UNPROVEN sobre o mesmo mapa do preinit; registros e
@@ -313,7 +353,7 @@ int bt_gptk_seal(void)
     fprintf(stderr,
             "[bt/gptk] runtime=%s evidence=%s authority=NEXTOS_CONTROLLERS/%u "
             "source=%s sinks=%zu sha256=%.16s...\n",
-            nxinput_gptk_runtime_marker(),
+            NXINPUT_GPTK4_RUNTIME_MARKER,
             nxinput_gptk_event_evidence_schema(),
             bt_preinit.map.schema_version, bt_gptk_source_name(),
             bt_sink_count, bt_preinit.receipt.selected_sha256);
@@ -323,7 +363,7 @@ int bt_gptk_seal(void)
              "\"mapping_sha256\":\"%s\",\"source\":\"%s\",\"gptk_schema\":%u,"
              "\"face_layout\":\"%s\",\"sinks\":%zu}",
              nxinput_gptk_event_evidence_schema(),
-             nxinput_gptk_runtime_marker(),
+             NXINPUT_GPTK4_RUNTIME_MARKER,
              bt_preinit.receipt.selected_sha256, bt_gptk_source_name(),
              bt_preinit.map.schema_version,
              nxinput_gptk_face_layout_name(bt_preinit.face_layout),

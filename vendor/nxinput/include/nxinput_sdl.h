@@ -79,6 +79,17 @@ typedef enum nxinput_sdl_domain {
   /* SDL3's Linux evdev backend. Stated separately ON PURPOSE: whether it
    * equals SDL2's is a measured fact, not a definition. */
   NXINPUT_SDL_DOMAIN_SDL3_EVDEV,
+  /* V5 (0.11.0): SDL2 carrying the RetroArch-derived "input as retroarch
+   * udev" patch set, as shipped by the RetroArch-derived-derived CFW family. ConfigJoystick
+   * walks EVERY EV_KEY in ONE ascending sweep `for (i = 0; i < KEY_MAX)`
+   * (sdl2_input_as_retroarch_udev.patch + sdl2_input_p007_udev_buttons.patch
+   * delete the second low sweep) and the axis scan stops at ABS_MISC
+   * (sdl2_input_p005_limit_ABS_max.patch) with detected hat pairs removed.
+   * A mapping authored for this provider is NATIVE to it; projecting it into
+   * SDL2_EVDEV corrupts every ordinal that a low key precedes. This domain is
+   * selected ONLY by a provider descriptor (exported ById API, or a pinned
+   * DSO hash) -- never by CFW name, GUID, VID/PID, volume markers or major. */
+  NXINPUT_SDL_DOMAIN_SDL2_ASCENDING_PATCHED,
   NXINPUT_SDL_DOMAIN_COUNT
 } nxinput_sdl_domain;
 
@@ -114,8 +125,18 @@ const nxinput_sdl_plan *nxinput_sdl_domain_plan(nxinput_sdl_domain domain);
  * plan, not a version number. */
 int nxinput_sdl_domains_equal(nxinput_sdl_domain a, nxinput_sdl_domain b);
 
-/* The domain an SDL major's evdev backend uses. */
+/* The domain an SDL major's UPSTREAM evdev backend uses.
+ *
+ * V5 (0.11.0): this is the UPSTREAM PRESUMPTION and nothing more. It is no
+ * longer a target-domain decision: the seam takes the target from the
+ * provider descriptor (nxinput_provider.h), which may name this domain, the
+ * RetroArch-derived ascending domain or UNKNOWN. Callers that still use it as a
+ * decision are the V4 defect this line fixes; keep it only for the domain
+ * gate and for naming the upstream row of a major. */
 nxinput_sdl_domain nxinput_sdl_api_domain(nxinput_sdl_api api);
+
+/* V5: the ABS code where the RetroArch-derived axis sweep stops (linux ABS_MISC). */
+#define NXINPUT_SDL_ASCENDING_ABS_LIMIT 0x28u
 
 /* Ordinal <-> evdev code inside one domain, driven by MEASURED capability.
  * Negative means the domain cannot name that ordinal/code at all. */
@@ -131,6 +152,22 @@ int nxinput_sdl_axis_code(nxinput_sdl_domain domain,
 int nxinput_sdl_axis_ordinal(nxinput_sdl_domain domain,
                              const nxinput_godot_caps *caps,
                              unsigned int code);
+
+/* 0.11.1: how a domain DETECTS a hat inside the ABS_HAT range.
+ *   PAIR  a hat exists only when BOTH halves of the pair are present
+ *         (upstream SDL2/SDL3 GuessIfAxesAreDigitalHat on a pair);
+ *   ANY   ONE present half is enough (the pinned RetroArch-derived CFW patch
+ *         sdl2_input_p009_hat_definition.patch makes GuessIfAxesAreDigitalHat
+ *         return TRUE whenever either absinfo exists), so a lone ABS_HATnX
+ *         is a hat and BOTH codes of the pair leave the axis numbering.
+ * Applies to DETECTED domains only; KEPT/ALL never look at presence. */
+#define NXINPUT_SDL_HAT_DETECT_PAIR 0
+#define NXINPUT_SDL_HAT_DETECT_ANY 1
+int nxinput_sdl_domain_hat_detect(nxinput_sdl_domain domain);
+/* 1 when hat `hat_index` (0..3) exists for this domain over these caps. */
+int nxinput_sdl_hat_present(nxinput_sdl_domain domain,
+                            const nxinput_godot_caps *caps,
+                            unsigned int hat_index);
 
 const char *nxinput_sdl_domain_name(nxinput_sdl_domain domain);
 const char *nxinput_sdl_api_name(nxinput_sdl_api api);

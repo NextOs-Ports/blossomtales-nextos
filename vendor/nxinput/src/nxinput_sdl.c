@@ -18,19 +18,66 @@ static int is_hat_code(unsigned int code) {
   return code >= NXINPUT_GODOT_ABS_HAT0X && code <= NXINPUT_GODOT_ABS_HAT3Y;
 }
 
-/* Does this pad really present the hat PAIR that owns `code`? The backends
- * only remove a hat pair from the axis numbering when BOTH halves exist; a
- * lone ABS_HAT0X stays an ordinary axis. */
-static int hat_pair_present(const nxinput_godot_caps *caps, unsigned int code) {
+/* 0.11.1: hat detection per domain (see nxinput_sdl.h). Upstream needs the
+ * PAIR; the pinned RetroArch-derived patch p009 accepts ANY present half. Indexed by
+ * nxinput_sdl_domain; only DETECTED domains consult it. */
+static const int hat_detect[NXINPUT_SDL_DOMAIN_COUNT] = {
+    NXINPUT_SDL_HAT_DETECT_PAIR, /* UNDECLARED (unused) */
+    NXINPUT_SDL_HAT_DETECT_PAIR, /* JOYDEV_LEGACY (KEPT: unused) */
+    NXINPUT_SDL_HAT_DETECT_PAIR, /* SDL2_LEGACY_EVDEV (ALL: unused) */
+    NXINPUT_SDL_HAT_DETECT_PAIR, /* SDL2_EVDEV */
+    NXINPUT_SDL_HAT_DETECT_PAIR, /* SDL3_EVDEV */
+    NXINPUT_SDL_HAT_DETECT_ANY,  /* SDL2_ASCENDING_PATCHED (p009) */
+};
+
+int nxinput_sdl_domain_hat_detect(nxinput_sdl_domain domain) {
+  if ((int)domain < 0 || (int)domain >= (int)NXINPUT_SDL_DOMAIN_COUNT) {
+    return NXINPUT_SDL_HAT_DETECT_PAIR;
+  }
+  return hat_detect[domain];
+}
+
+/* Does this pad present the hat that owns `code`, under `domain`'s
+ * detection rule? PAIR: both halves; ANY: either half (p009). When a hat is
+ * detected BOTH codes of its pair leave the axis numbering. */
+static int hat_detected(nxinput_sdl_domain domain,
+                        const nxinput_godot_caps *caps, unsigned int code) {
   unsigned int base = NXINPUT_GODOT_ABS_HAT0X +
                       ((code - NXINPUT_GODOT_ABS_HAT0X) / 2u) * 2u;
-  return bit_set(caps->abs_bits, caps->abs_bit_count, base) &&
-         bit_set(caps->abs_bits, caps->abs_bit_count, base + 1u);
+  int x = bit_set(caps->abs_bits, caps->abs_bit_count, base);
+  int y = bit_set(caps->abs_bits, caps->abs_bit_count, base + 1u);
+  if (nxinput_sdl_domain_hat_detect(domain) == NXINPUT_SDL_HAT_DETECT_ANY) {
+    return x || y;
+  }
+  return x && y;
+}
+
+int nxinput_sdl_hat_present(nxinput_sdl_domain domain,
+                            const nxinput_godot_caps *caps,
+                            unsigned int hat_index) {
+  const nxinput_sdl_plan *plan = nxinput_sdl_domain_plan(domain);
+  unsigned int base = NXINPUT_GODOT_ABS_HAT0X + hat_index * 2u;
+  if (plan == 0 || caps == 0 || caps->abs_bits == 0 ||
+      hat_index >= (unsigned int)NXINPUT_GODOT_HAT_COUNT ||
+      (size_t)base + 1u >= caps->abs_bit_count) {
+    return 0;
+  }
+  if (plan->axis_skips_hats == NXINPUT_SDL_HATS_KEPT) {
+    /* joydev: hats are axes; a "hat" exists only as a complete pair */
+    return bit_set(caps->abs_bits, caps->abs_bit_count, base) &&
+           bit_set(caps->abs_bits, caps->abs_bit_count, base + 1u);
+  }
+  if (plan->axis_skips_hats == NXINPUT_SDL_HATS_ALL) {
+    return bit_set(caps->abs_bits, caps->abs_bit_count, base) &&
+           bit_set(caps->abs_bits, caps->abs_bit_count, base + 1u);
+  }
+  return hat_detected(domain, caps, base);
 }
 
 /* Does this domain's axis scan pass over `code`? The three states are real
  * backend behaviours, not degrees of strictness. */
-static int axis_is_skipped(const nxinput_sdl_plan *plan,
+static int axis_is_skipped(nxinput_sdl_domain domain,
+                           const nxinput_sdl_plan *plan,
                            const nxinput_godot_caps *caps, unsigned int code) {
   if (!is_hat_code(code)) {
     return 0;
@@ -39,7 +86,7 @@ static int axis_is_skipped(const nxinput_sdl_plan *plan,
     return 1;
   }
   if (plan->axis_skips_hats == NXINPUT_SDL_HATS_DETECTED) {
-    return hat_pair_present(caps, code);
+    return hat_detected(domain, caps, code);
   }
   return 0;
 }
@@ -79,6 +126,16 @@ static const nxinput_sdl_plan plans[NXINPUT_SDL_DOMAIN_COUNT] = {
       {0u, NXINPUT_GODOT_BTN_JOYSTICK}},
      2u,
      {0u, NXINPUT_GODOT_ABS_MAX},
+     NXINPUT_SDL_HATS_DETECTED},
+    /* SDL2_ASCENDING_PATCHED (V5): one sweep `for (i = 0; i < KEY_MAX)`,
+     * axes `for (i = 0; i < ABS_MISC)` with detected hat pairs removed.
+     * Transcribed from the pinned the pinned CFW patch set
+     * (tests/providers/patches/sdl2_input_as_retroarch_udev.patch,
+     * sdl2_input_p007_udev_buttons.patch, sdl2_input_p005_limit_ABS_max.patch)
+     * and measured against libSDL2-2.0.so.0.3000.12 sha256 8c4dc956... */
+    {{{0u, NXINPUT_GODOT_KEY_MAX}, {0u, 0u}},
+     1u,
+     {0u, NXINPUT_SDL_ASCENDING_ABS_LIMIT},
      NXINPUT_SDL_HATS_DETECTED},
 };
 
@@ -212,7 +269,7 @@ int nxinput_sdl_axis_code(nxinput_sdl_domain domain,
     if (!bit_set(caps->abs_bits, caps->abs_bit_count, code)) {
       continue;
     }
-    if (axis_is_skipped(plan, caps, code)) {
+    if (axis_is_skipped(domain, plan, caps, code)) {
       continue;
     }
     if (seen == ordinal) {
@@ -242,7 +299,7 @@ int nxinput_sdl_axis_ordinal(nxinput_sdl_domain domain,
     if (!bit_set(caps->abs_bits, caps->abs_bit_count, scan)) {
       continue;
     }
-    if (axis_is_skipped(plan, caps, scan)) {
+    if (axis_is_skipped(domain, plan, caps, scan)) {
       continue;
     }
     if (scan == code) {
@@ -259,6 +316,8 @@ const char *nxinput_sdl_domain_name(nxinput_sdl_domain domain) {
     case NXINPUT_SDL_DOMAIN_SDL2_LEGACY_EVDEV: return "sdl2-legacy-evdev";
     case NXINPUT_SDL_DOMAIN_SDL2_EVDEV: return "sdl2-evdev";
     case NXINPUT_SDL_DOMAIN_SDL3_EVDEV: return "sdl3-evdev";
+    case NXINPUT_SDL_DOMAIN_SDL2_ASCENDING_PATCHED:
+      return "sdl2-ascending-patched";
     case NXINPUT_SDL_DOMAIN_UNDECLARED:
     default: return "undeclared";
   }

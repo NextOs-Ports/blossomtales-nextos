@@ -8,8 +8,13 @@ Inventário do que é **nosso**, do que é **de terceiros e embutido** e do que 
 | Componente | Origem | Licença |
 |---|---|---|
 | so-loader / shims JNI / ponte EGL | `ports/blossomtales/src/` | GPL-3.0-only |
+| fachada FBO MonoGame sobre o core GLES (`fbo_compat.c`) | idem | GPL-3.0-only |
 | decodificador de mídia (`aac_decoder.c`, `media_player.c`) | idem | GPL-3.0-only |
 | resolução de biblioteca do host (`host_libs.c`) | idem | GPL-3.0-only |
+
+O código nxinput 0.11.8 e nxcompat 0.5.3 usado pelo executável é vendorizado
+byte a byte do commit fixado em `FRAMEWORK-PIN.json`; os hashes individuais
+estão em `vendor/nxinput/PINS.json` e `vendor/nxcompat/PINS.json`.
 
 ## Terceiros embutidos (ligados estaticamente no executável)
 

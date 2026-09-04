@@ -2,7 +2,7 @@
 #ifndef NXINPUT_GPTK_H
 #define NXINPUT_GPTK_H
 
-/* NEXTOSCONTROLLERS.gptk -- the NextOS-own semantic controller mapping.
+/* NEXTOSCONTROLLERS.gptk -- the the framework host-own semantic controller mapping.
  *
  * This is NOT gptokeyb and never converts controller input into keyboard
  * keys. A mapping file binds SYMBOLIC physical controls (A, B, L2, ...) to
@@ -142,7 +142,7 @@ typedef enum nxinput_gptk_face_layout {
 /* Camera authority: who applies deadzone/curve/sensitivity. NEVER both --
  * multiplying framework and native sensitivity double-applies tuning. */
 typedef enum nxinput_gptk_authority {
-  NXINPUT_GPTK_AUTHORITY_NEXTOS = 0, /* NextOS shapes the axes (default) */
+  NXINPUT_GPTK_AUTHORITY_NEXTOS = 0, /* the framework host shapes the axes (default) */
   NXINPUT_GPTK_AUTHORITY_NATIVE = 1  /* raw pass-through; native menu governs */
 } nxinput_gptk_authority;
 

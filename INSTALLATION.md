@@ -46,6 +46,10 @@ pasta do port e **não** são publicados em lugar nenhum.
 
 ### Controles
 
+Na versão 1.4.5, o mapping permanece sob autoridade da SDL do próprio sistema
+quando o provider não puder ser provado. Isso evita o sintoma de o jogo detectar
+um controle, mas ignorar A, D-pad e `SELECT+START`.
+
 | Botão | No jogo | Nos menus |
 |---|---|---|
 | A | Ataque | Confirmar |
@@ -61,6 +65,20 @@ pasta do port e **não** são publicados em lugar nenhum.
 O layout dos botões de face segue o mapeamento do seu sistema. Se o seu
 aparelho usa o layout retrô, o botão que confirma é o que o seu sistema chama
 de A — o port não força posição de botão.
+
+### Arquivos seus (nunca sobrescritos)
+
+- `blossomtales/NEXTOSCONTROLLERS.gptk` — mapa de controles (`NEXTOS_CONTROLLERS/4`,
+  padrão Xbox posicional: A = sul, B = leste, X = oeste, Y = norte).
+- `blossomtales/NEXTOSSETTINGS.txt` — ajustes tipados, inclusive
+  `video.aspect=auto|engine|preserve|stretch` (painel 720×720: `preserve` =
+  imagem 16:9 centralizada com barras; `stretch` = padrão, preenche esticando).
+- `blossomtales/port-env.sh` — hook de ambiente do dono (`export NX_VIDEO_ASPECT=...`
+  também vale). A lógica do port fica no `adapter-env.sh` selado; não edite esse.
+
+Semeados uma vez a partir de `blossomtales/defaults/`; uma atualização nunca os
+sobrescreve (default novo aparece como `.new`). Para voltar ao padrão, apague o
+arquivo e abra o jogo.
 
 ### Espaço em disco
 
@@ -110,6 +128,10 @@ and is **never** published anywhere.
 
 ### Controls
 
+In version 1.4.5, the mapping remains under the system SDL's own authority when
+its provider cannot be proven. This prevents the game from detecting a
+controller while ignoring A, the D-pad and `SELECT+START`.
+
 | Button | In game | In menus |
 |---|---|---|
 | A | Attack | Confirm |
@@ -125,6 +147,20 @@ and is **never** published anywhere.
 Face button layout follows your system's mapping. If your device uses the retro
 layout, the confirm button is the one your system calls A — the port never
 forces a button position.
+
+### Your files (never overwritten)
+
+- `blossomtales/NEXTOSCONTROLLERS.gptk` — controls map (`NEXTOS_CONTROLLERS/4`,
+  positional Xbox standard: A = south, B = east, X = west, Y = north).
+- `blossomtales/NEXTOSSETTINGS.txt` — typed settings, including
+  `video.aspect=auto|engine|preserve|stretch` (720×720 panel: `preserve` =
+  16:9 image centered with bars; `stretch` = default, fills by stretching).
+- `blossomtales/port-env.sh` — the owner's environment hook (`export
+  NX_VIDEO_ASPECT=...` works too). The port's own logic lives in the sealed
+  `adapter-env.sh`; do not edit that.
+
+Seeded once from `blossomtales/defaults/`; an update never overwrites them (a
+new default appears as `.new`). To reset, delete the file and launch the game.
 
 ### Disk space
 
